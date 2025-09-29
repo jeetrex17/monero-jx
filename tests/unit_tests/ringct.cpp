@@ -1220,7 +1220,7 @@ TEST(ringct, zeroCommmit)
   ASSERT_EQ(z, manual);
 }
 
-static rct::key uncachedZeroCommit(uint64_t amount)
+static rct::key uncachedZeroCommitVartime(uint64_t amount)
 {
   const rct::key am = rct::d2h(amount);
   const rct::key bH = rct::scalarmultH(am);
@@ -1229,14 +1229,14 @@ static rct::key uncachedZeroCommit(uint64_t amount)
 
 TEST(ringct, zeroCommitCache)
 {
-  ASSERT_EQ(rct::zeroCommitVartime(0), uncachedZeroCommit(0));
-  ASSERT_EQ(rct::zeroCommitVartime(1), uncachedZeroCommit(1));
-  ASSERT_EQ(rct::zeroCommitVartime(2), uncachedZeroCommit(2));
-  ASSERT_EQ(rct::zeroCommitVartime(10), uncachedZeroCommit(10));
-  ASSERT_EQ(rct::zeroCommitVartime(200), uncachedZeroCommit(200));
-  ASSERT_EQ(rct::zeroCommitVartime(1000000000), uncachedZeroCommit(1000000000));
-  ASSERT_EQ(rct::zeroCommitVartime(3000000000000), uncachedZeroCommit(3000000000000));
-  ASSERT_EQ(rct::zeroCommitVartime(900000000000000), uncachedZeroCommit(900000000000000));
+  ASSERT_EQ(rct::zeroCommitVartime(0), uncachedZeroCommitVartime(0));
+  ASSERT_EQ(rct::zeroCommitVartime(1), uncachedZeroCommitVartime(1));
+  ASSERT_EQ(rct::zeroCommitVartime(2), uncachedZeroCommitVartime(2));
+  ASSERT_EQ(rct::zeroCommitVartime(10), uncachedZeroCommitVartime(10));
+  ASSERT_EQ(rct::zeroCommitVartime(200), uncachedZeroCommitVartime(200));
+  ASSERT_EQ(rct::zeroCommitVartime(1000000000), uncachedZeroCommitVartime(1000000000));
+  ASSERT_EQ(rct::zeroCommitVartime(3000000000000), uncachedZeroCommitVartime(3000000000000));
+  ASSERT_EQ(rct::zeroCommitVartime(900000000000000), uncachedZeroCommitVartime(900000000000000));
 }
 
 TEST(ringct, H)
