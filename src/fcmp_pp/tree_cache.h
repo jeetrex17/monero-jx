@@ -50,85 +50,7 @@ namespace fcmp_pp
 namespace curve_trees
 {
 //----------------------------------------------------------------------------------------------------------------------
-using BlockIdx  = uint64_t;
-using BlockHash = crypto::hash;
-
-using LeafIdx       = uint64_t;
-using LayerIdx      = std::size_t;
-using ChildChunkIdx = uint64_t;
-
-using LastLockedBlockIdx = BlockIdx;
-using CreatedBlockIdx = BlockIdx;
-using NumOutputs      = std::size_t;
-
-using OutputRefHash = crypto::hash;
-
-struct BlockMeta final
-{
-    BlockIdx blk_idx;
-    BlockHash blk_hash;
-    uint64_t n_leaf_tuples;
-
-    BEGIN_SERIALIZE_OBJECT()
-        FIELD(blk_idx)
-        FIELD(blk_hash)
-        FIELD(n_leaf_tuples)
-    END_SERIALIZE()
-};
-
-// We need to use a ref count on all individual elems in the cache because it's possible for:
-//  a) multiple blocks to share path elems that need to remain after pruning a block past the max reorg depth.
-//  b) multiple registered outputs to share the same path elems.
-// We can't remove a cached elem unless we know it's ref'd 0 times.
-struct CachedLeafChunk final
-{
-    std::vector<OutputPair> leaves;
-    uint64_t ref_count;
-
-    BEGIN_SERIALIZE_OBJECT()
-        FIELD(leaves)
-        FIELD(ref_count)
-    END_SERIALIZE()
-};
-
-struct CachedTreeElemChunk final
-{
-    std::vector<crypto::ec_point> tree_elems;
-    uint64_t ref_count;
-
-    BEGIN_SERIALIZE_OBJECT()
-        FIELD(tree_elems)
-        FIELD(ref_count)
-    END_SERIALIZE()
-};
-
-struct AssignedLeafIdx final
-{
-    bool assigned_leaf_idx{false};
-    LeafIdx leaf_idx{0};
-
-    void assign_leaf(const LeafIdx idx) { leaf_idx = idx; assigned_leaf_idx = true; }
-    void unassign_leaf() { leaf_idx = 0; assigned_leaf_idx = false; }
-
-    BEGIN_SERIALIZE_OBJECT()
-        FIELD(assigned_leaf_idx)
-        FIELD(leaf_idx)
-    END_SERIALIZE()
-};
-
-using LockedOutsByLastLockedBlock = std::unordered_map<LastLockedBlockIdx, std::vector<UnifiedOutput>>;
-using LockedOutputRefHashes       = std::unordered_map<LastLockedBlockIdx, NumOutputs>;
-using LockedOutputsByCreated      = std::unordered_map<CreatedBlockIdx, LockedOutputRefHashes>;
-
-using RegisteredOutputs = std::unordered_map<OutputRefHash, AssignedLeafIdx>;
-using LeafCache         = std::unordered_map<ChildChunkIdx, CachedLeafChunk>;
-using ChildChunkCache   = std::unordered_map<ChildChunkIdx, CachedTreeElemChunk>;
-
-// TODO: technically this can be a vector. There should *always* be at least 1 entry for every layer
-using TreeElemCache     = std::unordered_map<LayerIdx, ChildChunkCache>;
-
-static constexpr int TREE_CACHE_VERSION = 0;
-
+static const int TREE_CACHE_VERSION = 0;
 //----------------------------------------------------------------------------------------------------------------------
 //----------------------------------------------------------------------------------------------------------------------
 // Syncs the tree and keeps a user's known received outputs up to date, all saved in memory.
@@ -268,6 +190,8 @@ private:
     // Used for getting tree extensions when growing and for trimming
     // - These are unspecific to the wallet's registered outputs. These are strictly necessary to ensure we can rebuild
     //   the tree extensions (and trim backwards) for each block correctly locally when syncing.
+    // - It's possible for m_cached_blocks.size() > m_max_reorg_depth if the max reorg depth changes across runs.
+    //   This is ok as implemented. m_cached_blocks.size() will stay constant while syncing in this case.
     std::deque<BlockMeta> m_cached_blocks;
 
     mutable uint64_t m_getting_unlocked_outs_ms{0};
@@ -285,8 +209,6 @@ public:
         FIELD(m_leaf_cache)
         FIELD(m_tree_elem_cache)
         FIELD(m_cached_blocks)
-        // It's possible for m_cached_blocks.size() > m_max_reorg_depth if the max reorg depth changes across runs.
-        // This is ok as implemented. m_cached_blocks.size() will stay constant while syncing in this case.
     END_SERIALIZE()
 };
 

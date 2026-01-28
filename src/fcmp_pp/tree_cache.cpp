@@ -1221,7 +1221,7 @@ void TreeCache<C1, C2>::init(const uint64_t start_block_idx,
     CHECK_AND_ASSERT_THROW_MES(m_cached_blocks.empty(), "expected empty tree cache");
     CHECK_AND_ASSERT_THROW_MES(n_leaf_tuples >= last_path.leaves.size(), "n_leaf_tuples too small");
 
-    fcmp_pp::curve_trees::BlockMeta init_block{
+    fcmp_pp::BlockMeta init_block{
         .blk_idx       = start_block_idx,
         .blk_hash      = start_block_hash,
         .n_leaf_tuples = n_leaf_tuples,

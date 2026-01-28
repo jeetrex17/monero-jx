@@ -31,6 +31,7 @@
 #include <map>
 #include <memory>
 #include <type_traits>
+#include <utility>
 #include <variant>
 #include <vector>
 
@@ -380,6 +381,64 @@ struct PathForProofT final
     std::vector<std::vector<typename C2::Scalar>> c2_scalar_chunks;
     std::vector<std::vector<typename C1::Scalar>> c1_scalar_chunks;
 };
+//----------------------------------------------------------------------------------------------------------------------
+//   Tree cache types
+//----------------------------------------------------------------------------------------------------------------------
+using BlockIdx  = uint64_t;
+using BlockHash = crypto::hash;
+
+using LeafIdx       = uint64_t;
+using LayerIdx      = std::size_t;
+using ChildChunkIdx = uint64_t;
+
+using LastLockedBlockIdx = BlockIdx;
+using CreatedBlockIdx = BlockIdx;
+using NumOutputs      = std::size_t;
+
+using OutputRefHash = crypto::hash;
+
+struct BlockMeta final
+{
+    BlockIdx blk_idx;
+    BlockHash blk_hash;
+    uint64_t n_leaf_tuples;
+};
+
+// We need to use a ref count on all individual elems in the cache because it's possible for:
+//  a) multiple blocks to share path elems that need to remain after pruning a block past the max reorg depth.
+//  b) multiple registered outputs to share the same path elems.
+// We can't remove a cached elem unless we know it's ref'd 0 times.
+struct CachedLeafChunk final
+{
+    std::vector<OutputPair> leaves;
+    uint64_t ref_count;
+};
+
+struct CachedTreeElemChunk final
+{
+    std::vector<crypto::ec_point> tree_elems;
+    uint64_t ref_count;
+};
+
+struct AssignedLeafIdx final
+{
+    bool assigned_leaf_idx{false};
+    LeafIdx leaf_idx{0};
+
+    void assign_leaf(const LeafIdx idx) { leaf_idx = idx; assigned_leaf_idx = true; }
+    void unassign_leaf() { leaf_idx = 0; assigned_leaf_idx = false; }
+};
+
+using LockedOutsByLastLockedBlock = std::unordered_map<LastLockedBlockIdx, std::vector<UnifiedOutput>>;
+using LockedOutputRefHashes       = std::unordered_map<LastLockedBlockIdx, NumOutputs>;
+using LockedOutputsByCreated      = std::unordered_map<CreatedBlockIdx, LockedOutputRefHashes>;
+
+using RegisteredOutputs = std::unordered_map<OutputRefHash, AssignedLeafIdx>;
+using LeafCache         = std::unordered_map<ChildChunkIdx, CachedLeafChunk>;
+using ChildChunkCache   = std::unordered_map<ChildChunkIdx, CachedTreeElemChunk>;
+
+// TODO: technically this can be a vector. There should *always* be at least 1 entry for every layer
+using TreeElemCache     = std::unordered_map<LayerIdx, ChildChunkCache>;
 //----------------------------------------------------------------------------------------------------------------------
 //   FCMP++ prove/verify types
 //----------------------------------------------------------------------------------------------------------------------
