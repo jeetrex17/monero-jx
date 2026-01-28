@@ -185,7 +185,7 @@ static uint64_t remove_outputs_created_at_block(const CreatedBlockIdx &created_b
 template<typename C1, typename C2>
 static void cache_leaf_chunk(const ChildChunkIdx chunk_idx,
     const std::size_t leaf_parent_chunk_width,
-    const typename CurveTrees<C1, C2>::Leaves &leaves,
+    const Leaves &leaves,
     const LeafIdx start_leaf_tuple_idx,
     const uint64_t n_leaf_tuples,
     const bool bump_ref_count,
@@ -686,7 +686,7 @@ static void update_registered_path(const std::shared_ptr<CurveTrees<C1, C2>> &cu
 //----------------------------------------------------------------------------------------------------------------------
 template<typename C1, typename C2>
 static void cache_last_chunk_leaves(const std::shared_ptr<CurveTrees<C1, C2>> &curve_trees,
-    const typename CurveTrees<C1, C2>::Leaves &leaves,
+    const Leaves &leaves,
     const LeafIdx start_leaf_tuple_idx,
     const uint64_t n_leaf_tuples,
     LeafCache &leaf_cache_inout)
@@ -1215,7 +1215,7 @@ template<typename C1, typename C2>
 void TreeCache<C1, C2>::init(const uint64_t start_block_idx,
     const crypto::hash &start_block_hash,
     const uint64_t n_leaf_tuples,
-    const fcmp_pp::curve_trees::PathBytes &last_path,
+    const fcmp_pp::PathBytes &last_path,
     const OutsByLastLockedBlock &timelocked_outputs)
 {
     CHECK_AND_ASSERT_THROW_MES(m_cached_blocks.empty(), "expected empty tree cache");
@@ -1277,7 +1277,7 @@ void TreeCache<C1, C2>::init(const uint64_t start_block_idx,
 template void TreeCache<Selene, Helios>::init(const uint64_t start_block_idx,
     const crypto::hash &start_block_hash,
     const uint64_t n_leaf_tuples,
-    const fcmp_pp::curve_trees::PathBytes &last_hashes,
+    const fcmp_pp::PathBytes &last_hashes,
     const OutsByLastLockedBlock &timelocked_outputs);
 //----------------------------------------------------------------------------------------------------------------------
 template<typename C1, typename C2>

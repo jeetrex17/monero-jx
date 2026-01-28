@@ -440,7 +440,7 @@ private:
 
   template<typename C>
   crypto::ec_point grow_layer(const std::unique_ptr<C> &curve,
-    const fcmp_pp::curve_trees::LayerExtension<C> &layer_extension,
+    const fcmp_pp::LayerExtension<C> &layer_extension,
     const uint64_t layer_idx);
 
   uint64_t trim_leaves(const uint64_t new_n_leaf_tuples, const uint64_t trim_block_idx) override;
@@ -464,7 +464,7 @@ private:
 
   std::vector<crypto::ec_point> get_tree_edge(uint64_t block_id) const override;
 
-  fcmp_pp::curve_trees::PathBytes get_path(const fcmp_pp::curve_trees::PathIndexes &path_indexes) const override;
+  fcmp_pp::PathBytes get_path(const fcmp_pp::PathIndexes &path_indexes) const override;
 
   template<typename C_CHILD, typename C_PARENT>
   bool audit_layer(const std::unique_ptr<C_CHILD> &c_child,

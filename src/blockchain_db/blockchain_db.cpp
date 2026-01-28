@@ -452,7 +452,7 @@ void BlockchainDB::trim_tree(const uint64_t new_n_leaf_tuples, const uint64_t tr
   this->trim_layers(new_n_leaf_tuples, n_elems_per_layer, prev_tree_edge, expected_root_idx);
 }
 
-std::pair<uint64_t, fcmp_pp::curve_trees::PathBytes> BlockchainDB::get_last_path(const uint64_t block_idx) const
+std::pair<uint64_t, fcmp_pp::PathBytes> BlockchainDB::get_last_path(const uint64_t block_idx) const
 {
   LOG_PRINT_L3("BlockchainDB::" << __func__);
 
@@ -485,7 +485,7 @@ std::pair<uint64_t, fcmp_pp::curve_trees::PathBytes> BlockchainDB::get_last_path
 uint64_t BlockchainDB::get_path_by_unified_id(const std::vector<uint64_t> &unified_ids,
   const uint64_t as_of_n_blocks,
   std::vector<uint64_t> &leaf_idxs_out,
-  std::vector<fcmp_pp::curve_trees::PathBytes> &paths_out) const
+  std::vector<fcmp_pp::PathBytes> &paths_out) const
 {
   LOG_PRINT_L3("BlockchainDB::" << __func__);
 
@@ -494,7 +494,7 @@ uint64_t BlockchainDB::get_path_by_unified_id(const std::vector<uint64_t> &unifi
   // Initialize result vectors with 0 values. If outptut is not in the tree,
   // result vectors kept as 0 values
   leaf_idxs_out = std::vector<uint64_t>(unified_ids.size(), 0);
-  paths_out = std::vector<fcmp_pp::curve_trees::PathBytes>(unified_ids.size(), fcmp_pp::curve_trees::PathBytes{});
+  paths_out = std::vector<fcmp_pp::PathBytes>(unified_ids.size(), fcmp_pp::PathBytes{});
 
   if (unified_ids.empty())
     return 0;

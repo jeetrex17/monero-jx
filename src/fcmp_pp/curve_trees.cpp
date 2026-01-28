@@ -29,6 +29,7 @@
 #include "curve_trees.h"
 
 #include "common/threadpool.h"
+#include "fcmp_pp_crypto.h"
 #include "profile_tools.h"
 #include "string_tools.h"
 
@@ -1383,7 +1384,7 @@ typename CurveTrees<C1, C2>::TreeExtension CurveTrees<C1, C2>::path_to_tree_exte
     const PathIndexes &path_idxs) const
 {
     typename CurveTrees<C1, C2>::TreeExtension tree_extension;
-    tree_extension.leaves = typename CurveTrees<C1, C2>::Leaves{
+    tree_extension.leaves = Leaves{
             .start_leaf_tuple_idx = path_idxs.leaf_range.first,
             .tuples               = path_bytes.leaves
         };

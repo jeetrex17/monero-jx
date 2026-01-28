@@ -614,7 +614,7 @@ void CurveTreesGlobalTree::extend_tree(const CurveTreesV1::TreeExtension &tree_e
         if (parent_is_c1)
         {
             CHECK_AND_ASSERT_THROW_MES(c1_idx < c1_extensions.size(), "unexpected c1 layer extension");
-            const fcmp_pp::curve_trees::LayerExtension<Selene> &c1_ext = c1_extensions[c1_idx];
+            const fcmp_pp::LayerExtension<Selene> &c1_ext = c1_extensions[c1_idx];
 
             CHECK_AND_ASSERT_THROW_MES(!c1_ext.hashes.empty(), "empty c1 layer extension");
 
@@ -647,7 +647,7 @@ void CurveTreesGlobalTree::extend_tree(const CurveTreesV1::TreeExtension &tree_e
         else
         {
             CHECK_AND_ASSERT_THROW_MES(c2_idx < c2_extensions.size(), "unexpected c2 layer extension");
-            const fcmp_pp::curve_trees::LayerExtension<Helios> &c2_ext = c2_extensions[c2_idx];
+            const fcmp_pp::LayerExtension<Helios> &c2_ext = c2_extensions[c2_idx];
 
             CHECK_AND_ASSERT_THROW_MES(!c2_ext.hashes.empty(), "empty c2 layer extension");
 
@@ -795,7 +795,7 @@ void CurveTreesGlobalTree::log_tree_extension(const CurveTreesV1::TreeExtension 
         const auto C_x = m_curve_trees.m_c1->to_string(leaf.C_x);
         const auto C_y = m_curve_trees.m_c1->to_string(leaf.C_y);
 
-        MDEBUG("Leaf tuple idx " << (tree_extension.leaves.start_leaf_tuple_idx + (i * CurveTreesV1::LEAF_TUPLE_SIZE))
+        MDEBUG("Leaf tuple idx " << (tree_extension.leaves.start_leaf_tuple_idx + (i * fcmp_pp::LEAF_TUPLE_SIZE))
             << " : { O_x: " << O_x << " , O_y: " << O_y << " , I_x: " << I_x << " , I_y: " << I_y
             << " , C_x: " << C_x << " , C_y: " << C_y << " }");
     }
@@ -809,7 +809,7 @@ void CurveTreesGlobalTree::log_tree_extension(const CurveTreesV1::TreeExtension 
         {
             CHECK_AND_ASSERT_THROW_MES(c1_idx < c1_extensions.size(), "unexpected c1 layer");
 
-            const fcmp_pp::curve_trees::LayerExtension<Selene> &c1_layer = c1_extensions[c1_idx];
+            const fcmp_pp::LayerExtension<Selene> &c1_layer = c1_extensions[c1_idx];
             MDEBUG("Selene tree extension start idx: " << c1_layer.start_idx);
 
             for (std::size_t j = 0; j < c1_layer.hashes.size(); ++j)
@@ -822,7 +822,7 @@ void CurveTreesGlobalTree::log_tree_extension(const CurveTreesV1::TreeExtension 
         {
             CHECK_AND_ASSERT_THROW_MES(c2_idx < c2_extensions.size(), "unexpected c2 layer");
 
-            const fcmp_pp::curve_trees::LayerExtension<Helios> &c2_layer = c2_extensions[c2_idx];
+            const fcmp_pp::LayerExtension<Helios> &c2_layer = c2_extensions[c2_idx];
             MDEBUG("Helios tree extension start idx: " << c2_layer.start_idx);
 
             for (std::size_t j = 0; j < c2_layer.hashes.size(); ++j)

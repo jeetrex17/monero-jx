@@ -179,7 +179,7 @@ public:
     void init(const uint64_t start_block_idx,
         const crypto::hash &start_block_hash,
         const uint64_t n_leaf_tuples,
-        const fcmp_pp::curve_trees::PathBytes &last_path,
+        const fcmp_pp::PathBytes &last_path,
         const OutsByLastLockedBlock &timelocked_outputs);
 
     // TODO: make this part of the TreeSync interface

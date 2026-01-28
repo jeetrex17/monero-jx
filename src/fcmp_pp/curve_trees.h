@@ -29,13 +29,10 @@
 #pragma once
 
 #include "crypto/crypto.h"
-#include "fcmp_pp_crypto.h"
 #include "fcmp_pp_types.h"
 #include "misc_log_ex.h"
-#include "serialization/keyvalue_serialization.h"
 #include "tower_cycle.h"
 
-#include <map>
 #include <memory>
 #include <vector>
 
@@ -45,85 +42,6 @@ namespace fcmp_pp
 namespace curve_trees
 {
 //----------------------------------------------------------------------------------------------------------------------
-//----------------------------------------------------------------------------------------------------------------------
-// A layer of contiguous hashes starting from a specific start_idx in the tree
-template<typename C>
-struct LayerExtension final
-{
-    uint64_t                       start_idx{0};
-    bool                           update_existing_last_hash;
-    std::vector<typename C::Point> hashes;
-};
-
-// Useful metadata for growing a layer
-struct GrowLayerInstructions final
-{
-    // The max chunk width of children used to hash into a parent
-    std::size_t parent_chunk_width;
-
-    // Total parents refers to the total number of hashes of chunks of children
-    uint64_t old_total_parents;
-    uint64_t new_total_parents;
-
-    // When updating the tree, we use this boolean to know when we'll need to use the tree's existing old root in order
-    // to set a new layer after that root
-    // - We'll need to be sure the old root gets hashed when setting the next layer
-    bool setting_next_layer_after_old_root;
-    // When the last child in the child layer changes, we'll need to use its old value to update its parent hash
-    bool need_old_last_child;
-    // When the last parent in the layer changes, we'll need to use its old value to update itself
-    bool need_old_last_parent;
-
-    // The first chunk that needs to be updated's first child's offset within that chunk
-    std::size_t start_offset;
-    // The parent's starting index in the layer
-    uint64_t next_parent_start_index;
-};
-
-// Struct composed of ec elems needed to get a full-fledged leaf tuple
-struct PreLeafTuple final
-{
-    fcmp_pp::EdDerivatives O_derivatives;
-    fcmp_pp::EdDerivatives I_derivatives;
-    fcmp_pp::EdDerivatives C_derivatives;
-};
-
-struct ChunkBytes final
-{
-    std::vector<crypto::ec_point> chunk_bytes;
-
-    bool operator==(const ChunkBytes &other) const { return chunk_bytes == other.chunk_bytes; }
-
-    BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE_CONTAINER_POD_AS_BLOB(chunk_bytes)
-    END_KV_SERIALIZE_MAP()
-};
-
-struct PathBytes final
-{
-    std::vector<UnifiedOutput> leaves;
-    std::vector<ChunkBytes> layer_chunks;
-
-    bool operator==(const PathBytes &other) const {return leaves == other.leaves && layer_chunks == other.layer_chunks;}
-
-    BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE_CONTAINER_POD_AS_BLOB(leaves)
-        KV_SERIALIZE(layer_chunks)
-    END_KV_SERIALIZE_MAP()
-};
-
-// The indexes in the tree of a leaf's path elems containing whole chunks at each layer
-// - leaf_range refers to a complete chunk of leaves
-struct PathIndexes final
-{
-    using StartIdx = uint64_t;
-    using EndIdxExclusive = uint64_t;
-    using Range = std::pair<StartIdx, EndIdxExclusive>;
-
-    Range leaf_range;
-    std::vector<Range> layers;
-};
-
 //----------------------------------------------------------------------------------------------------------------------
 // Hash a chunk of new children
 template<typename C>
@@ -155,93 +73,15 @@ public:
 
 //member structs
 public:
-    // Tuple that composes a single leaf in the tree
-    struct LeafTuple final
-    {
-        // Output ed25519 point wei x and y coordinates
-        typename C1::Scalar O_x;
-        typename C1::Scalar O_y;
-        // Key image generator wei x and y coordinates
-        typename C1::Scalar I_x;
-        typename C1::Scalar I_y;
-        // Commitment wei x and y coordinates
-        typename C1::Scalar C_x;
-        typename C1::Scalar C_y;
-    };
-    static const std::size_t LEAF_TUPLE_POINTS = 3;
-    static const std::size_t LEAF_TUPLE_SIZE = LEAF_TUPLE_POINTS * 2;
+    using LeafTuple = LeafTupleT<C1>;
     static_assert(sizeof(LeafTuple) == (sizeof(typename C1::Scalar) * LEAF_TUPLE_SIZE), "unexpected LeafTuple size");
 
-    // Contiguous leaves in the tree, starting a specified start_idx in the leaf layer
-    struct Leaves final
-    {
-        // Starting leaf tuple index in the leaf layer
-        uint64_t                   start_leaf_tuple_idx{0};
-        // Contiguous leaves in a tree that start at the start_idx
-        std::vector<UnifiedOutput> tuples;
-    };
+    using TreeExtension     = TreeExtensionT<C1, C2>;
+    using LastHashes        = LastHashesT<C1, C2>;
+    using Path              = PathT<C1, C2>;
+    using ConsolidatedPaths = ConsolidatedPathsT<C1, C2>;
+    using PathForProof      = PathForProofT<C1, C2>;
 
-    // A struct useful to extend an existing tree
-    // - layers alternate between C1 and C2
-    // - c1_layer_extensions[0] is first layer after leaves, then c2_layer_extensions[0], c1_layer_extensions[1], etc
-    struct TreeExtension final
-    {
-        Leaves                          leaves;
-        std::vector<LayerExtension<C1>> c1_layer_extensions;
-        std::vector<LayerExtension<C2>> c2_layer_extensions;
-    };
-
-    // Last hashes from each layer in the tree
-    // - layers alternate between C1 and C2
-    // - c1_last_hashes[0] refers to the layer after leaves, then c2_last_hashes[0], then c1_last_hashes[1], etc
-    struct LastHashes final
-    {
-        std::vector<typename C1::Point> c1_last_hashes;
-        std::vector<typename C2::Point> c2_last_hashes;
-    };
-
-    // A path in the tree containing whole chunks at each layer
-    // - leaves contain a complete chunk of leaves, encoded as compressed ed25519 points
-    // - c1_layers[0] refers to the chunk of elems in the tree in the layer after leaves. The hash of the chunk of
-    //   leaves is 1 member of the c1_layers[0] chunk. The rest of c1_layers[0] is the chunk of elems that hash is in.
-    // - layers alternate between C1 and C2
-    // - c2_layers[0] refers to the chunk of elems in the tree in the layer after c1_layers[0]. The hash of the chunk
-    //   of c1_layers[0] is 1 member of the c2_layers[0] chunk. The rest of c2_layers[0] is the chunk of elems that hash
-    //   is in.
-    // - c1_layers[1] refers to the chunk of elems in the tree in the layer after c2_layers[0] etc.
-    struct Path final
-    {
-        std::vector<OutputTuple> leaves;
-        // TODO: std::size_t idx_in_leaves;
-        std::vector<std::vector<typename C1::Point>> c1_layers;
-        std::vector<std::vector<typename C2::Point>> c2_layers;
-
-        void clear()
-        {
-            leaves.clear();
-            c1_layers.clear();
-            c2_layers.clear();
-        }
-
-        bool empty() const { return leaves.empty() && c1_layers.empty() && c2_layers.empty(); }
-    };
-
-    // Contains minimum path elems necessary for multiple paths (e.g. only contains the root once)
-    struct ConsolidatedPaths final
-    {
-        std::unordered_map<uint64_t, std::vector<OutputTuple>> leaves_by_chunk_idx;
-        std::vector<std::unordered_map<uint64_t, std::vector<typename C1::Point>>> c1_layers;
-        std::vector<std::unordered_map<uint64_t, std::vector<typename C2::Point>>> c2_layers;
-    };
-
-    // A path ready to be used to construct an FCMP++ proof
-    struct PathForProof final
-    {
-        std::vector<fcmp_pp::OutputTuple> leaves;
-        std::size_t output_idx;
-        std::vector<std::vector<typename C2::Scalar>> c2_scalar_chunks;
-        std::vector<std::vector<typename C1::Scalar>> c1_scalar_chunks;
-    };
 //member functions
 public:
     // Convert output pairs into leaf tuples, from {output pubkey,commitment} -> {O,C} -> {O.x,O.y,I.x,I.y,C.x,C.y}

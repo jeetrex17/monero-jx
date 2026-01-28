@@ -1505,7 +1505,7 @@ std::vector<crypto::ec_point> BlockchainLMDB::grow_with_tree_extension(const fcm
 
 template<typename C>
 crypto::ec_point BlockchainLMDB::grow_layer(const std::unique_ptr<C> &curve,
-  const fcmp_pp::curve_trees::LayerExtension<C> &layer_extension,
+  const fcmp_pp::LayerExtension<C> &layer_extension,
   const uint64_t layer_idx)
 {
   LOG_PRINT_L3("BlockchainLMDB::" << __func__);
@@ -1652,7 +1652,7 @@ std::vector<crypto::ec_point> BlockchainLMDB::get_tree_edge(uint64_t block_id) c
   return res;
 }
 
-fcmp_pp::curve_trees::PathBytes BlockchainLMDB::get_path(const fcmp_pp::curve_trees::PathIndexes &path_indexes) const
+fcmp_pp::PathBytes BlockchainLMDB::get_path(const fcmp_pp::PathIndexes &path_indexes) const
 {
   LOG_PRINT_L3("BlockchainLMDB::" << __func__);
   check_open();
@@ -1661,7 +1661,7 @@ fcmp_pp::curve_trees::PathBytes BlockchainLMDB::get_path(const fcmp_pp::curve_tr
   RCURSOR(leaves)
   RCURSOR(layers)
 
-  fcmp_pp::curve_trees::PathBytes path_bytes;
+  fcmp_pp::PathBytes path_bytes;
 
   auto &leaves_out = path_bytes.leaves;
   auto &layer_chunks_out = path_bytes.layer_chunks;
@@ -1705,7 +1705,7 @@ fcmp_pp::curve_trees::PathBytes BlockchainLMDB::get_path(const fcmp_pp::curve_tr
   std::size_t layer_idx = 0;
   for (const auto &layer_idx_range : path_indexes.layers)
   {
-    fcmp_pp::curve_trees::ChunkBytes chunk;
+    fcmp_pp::ChunkBytes chunk;
 
     MDB_val_set(k, layer_idx);
     MDB_val_set(v, layer_idx_range.first);
