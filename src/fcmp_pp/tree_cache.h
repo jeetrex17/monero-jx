@@ -29,7 +29,6 @@
 #pragma once
 
 #include "cryptonote_config.h"
-#include "cryptonote_basic/cryptonote_basic.h"
 #include "crypto/crypto.h"
 #include "crypto/hash.h"
 #include "curve_trees.h"

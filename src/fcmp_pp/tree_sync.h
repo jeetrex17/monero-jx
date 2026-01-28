@@ -28,8 +28,8 @@
 
 #pragma once
 
+#include "crypto/hash.h"
 #include "cryptonote_config.h"
-#include "cryptonote_basic/cryptonote_basic.h"
 #include "curve_trees.h"
 
 #include <memory>
