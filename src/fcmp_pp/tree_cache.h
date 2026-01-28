@@ -28,7 +28,6 @@
 
 #pragma once
 
-#include "cryptonote_config.h"
 #include "crypto/crypto.h"
 #include "crypto/hash.h"
 #include "curve_trees.h"
@@ -42,7 +41,6 @@
 
 #include <deque>
 #include <memory>
-#include <unordered_map>
 
 
 namespace fcmp_pp
