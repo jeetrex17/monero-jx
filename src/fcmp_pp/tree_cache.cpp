@@ -49,20 +49,20 @@ static OutputRefHash get_output_ref_hash(const OutputPair &o_variant)
     static_assert(sizeof(output_pubkey) == sizeof(commitment), "unexpected size of output pubkey & commitment");
 
     // Hash the type info as well
-    rct::key type = rct::key{};
+    crypto::public_key type = crypto::null_pkey;
     const std::size_t variant_index = o_variant.index();
-    static_assert(sizeof(type.bytes) >= sizeof(variant_index), "variant index type is too large");
-    memcpy(type.bytes, &variant_index, sizeof(variant_index));
+    static_assert(sizeof(type) >= sizeof(variant_index), "variant index type is too large");
+    memcpy(&type, &variant_index, sizeof(variant_index));
 
     static constexpr std::size_t N_HASH_ELEMS = 3;
-    const rct::key data[N_HASH_ELEMS] = {
-            rct::pk2rct(output_pubkey),
-            rct::pt2rct(commitment),
+    const crypto::public_key data[N_HASH_ELEMS] = {
+            output_pubkey,
+            (crypto::public_key&)commitment,
             type
         };
 
     crypto::hash h;
-    crypto::cn_fast_hash(data, N_HASH_ELEMS * sizeof(rct::key), h);
+    crypto::cn_fast_hash(data, N_HASH_ELEMS * sizeof(crypto::public_key), h);
     return h;
 };
 //----------------------------------------------------------------------------------------------------------------------

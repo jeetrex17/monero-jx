@@ -30,10 +30,11 @@
 
 #include "cryptonote_config.h"
 #include "cryptonote_basic/cryptonote_basic.h"
+#include "crypto/crypto.h"
+#include "crypto/hash.h"
 #include "curve_trees.h"
 #include "fcmp_pp_serialization.h"
 #include "fcmp_pp_types.h"
-#include "ringct/rctTypes.h"
 #include "serialization/containers.h"
 #include "serialization/crypto.h"
 #include "serialization/pair.h"
