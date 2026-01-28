@@ -40,7 +40,7 @@ namespace fcmp_pp
 {
 //----------------------------------------------------------------------------------------------------------------------
 
-FcmpRerandomizedOutputCompressed rerandomize_output(const OutputBytes output);
+FcmpRerandomizedOutputCompressed rerandomize_output(const OutputTuple output);
 FcmpRerandomizedOutputCompressed rerandomize_output(const crypto::public_key &onetime_address,
     const crypto::ec_point &amount_commitment,
     const bool use_biased_hash_to_point);

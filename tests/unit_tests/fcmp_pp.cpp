@@ -391,8 +391,8 @@ TEST(fcmp_pp, prove)
             const std::size_t output_idx = leaf_idx % curve_trees->m_c1_width;
 
             const fcmp_pp::OutputPair output_pair = fcmp_pp::LegacyOutputPair{{
-                rct::rct2pk(path.leaves[output_idx].O),
-                rct::rct2pt(path.leaves[output_idx].C)}};
+                (crypto::public_key&)path.leaves[output_idx].O,
+                (crypto::ec_point&)path.leaves[output_idx].C}};
             const auto output_tuple = fcmp_pp::curve_trees::output_to_tuple(output_pair);
 
             // ASSERT_TRUE(curve_trees->audit_path(path, output_pair, global_tree.get_n_leaf_tuples()));
@@ -404,13 +404,12 @@ TEST(fcmp_pp, prove)
             // Leaves
             const auto path_for_proof = curve_trees->path_for_proof(path, output_tuple);
 
-            const FcmpRerandomizedOutputCompressed rerandomized_output = fcmp_pp::rerandomize_output(
-                output_tuple.to_output_bytes());
+            const FcmpRerandomizedOutputCompressed rerandomized_output = fcmp_pp::rerandomize_output(output_tuple);
 
             pseudo_outs.emplace_back(rct::rct2pt(load_key(rerandomized_output.input.C_tilde)));
 
             key_images.emplace_back();
-            crypto::generate_key_image(rct::rct2pk(path.leaves[output_idx].O),
+            crypto::generate_key_image((crypto::public_key&)path.leaves[output_idx].O,
                 new_outputs.x_vec[leaf_idx],
                 key_images.back());
 
@@ -572,8 +571,8 @@ TEST(fcmp_pp, verify)
             const auto &leaf = leaf_chunk[leaf_offset];
 
             const fcmp_pp::OutputPair output_pair = fcmp_pp::LegacyOutputPair{{
-                rct::rct2pk(leaf.O),
-                rct::rct2pt(leaf.C)}};
+                (crypto::public_key&)leaf.O,
+                (crypto::ec_point&)leaf.C}};
             const auto output_tuple = fcmp_pp::curve_trees::output_to_tuple(output_pair);
 
             const auto &x = new_outputs.x_vec[leaf_idx];
@@ -586,13 +585,12 @@ TEST(fcmp_pp, verify)
             // Leaves
             const auto path_for_proof = curve_trees->path_for_proof(path, output_tuple);
 
-            const FcmpRerandomizedOutputCompressed rerandomized_output = fcmp_pp::rerandomize_output(
-                output_tuple.to_output_bytes());
+            const FcmpRerandomizedOutputCompressed rerandomized_output = fcmp_pp::rerandomize_output(output_tuple);
 
             pseudo_outs.emplace_back(rct::rct2pt(load_key(rerandomized_output.input.C_tilde)));
 
             key_images.emplace_back();
-            crypto::generate_key_image(rct::rct2pk(leaf.O),
+            crypto::generate_key_image((crypto::public_key&)leaf.O,
                 new_outputs.x_vec[leaf_idx],
                 key_images.back());
 
@@ -681,8 +679,8 @@ TEST(fcmp_pp, sal_completeness)
     crypto::generate_key_image(rct::rct2pk(O), rct::rct2sk(x), L);
 
     // Rerandomize
-    const fcmp_pp::curve_trees::OutputTuple output{ .O = O, .I = I, .C = C };
-    const FcmpRerandomizedOutputCompressed rerandomized_output{fcmp_pp::rerandomize_output(output.to_output_bytes())};
+    const auto output = fcmp_pp::output_tuple_from_bytes(rct::rct2pt(O), rct::rct2pt(I), rct::rct2pt(C));
+    const FcmpRerandomizedOutputCompressed rerandomized_output{fcmp_pp::rerandomize_output(output)};
 
     // Generate signable_tx_hash
     const crypto::hash signable_tx_hash = crypto::rand<crypto::hash>();
@@ -775,8 +773,8 @@ TEST(fcmp_pp, membership_completeness)
 
             // Set up rust path
             const fcmp_pp::OutputPair output_pair = fcmp_pp::LegacyOutputPair{{
-                rct::rct2pk(path.leaves[output_idx].O),
-                rct::rct2pt(path.leaves[output_idx].C)}};
+                (crypto::public_key&)path.leaves[output_idx].O,
+                (crypto::ec_point&)path.leaves[output_idx].C}};
             const auto output_tuple = fcmp_pp::curve_trees::output_to_tuple(output_pair);
             const auto path_for_proof = curve_trees->path_for_proof(path, output_tuple);
 
@@ -795,8 +793,8 @@ TEST(fcmp_pp, membership_completeness)
             // fcmp_pp::rerandomize_output() would work perfectly fine here as well, especially
             // since we're not balancing C~ and thus don't need to modify it.
             const FcmpRerandomizedOutputCompressed rerandomized_output = rerandomize_output_manual(
-                path.leaves.at(output_idx).O,
-                path.leaves.at(output_idx).C);
+                (rct::key&)path.leaves.at(output_idx).O,
+                (rct::key&)path.leaves.at(output_idx).C);
 
             // check the size of our precalculated branch blind cache
             ASSERT_EQ(helios_scalar_chunks.size(), expected_num_selene_branch_blinds);
@@ -864,8 +862,10 @@ TEST(fcmp_pp, calculate_fcmp_input_for_rerandomizations_convergence)
     const rct::key amount_commitment = rct::pkGen();
     const rct::key I = biased_derive_key_image_generator(onetime_address);
 
-    const fcmp_pp::curve_trees::OutputTuple output{ .O = onetime_address, .I = I, .C = amount_commitment };
-    const FcmpRerandomizedOutputCompressed rerandomized_output = fcmp_pp::rerandomize_output(output.to_output_bytes());
+    const fcmp_pp::OutputTuple output = fcmp_pp::output_tuple_from_bytes(rct::rct2pt(onetime_address),
+        rct::rct2pt(I),
+        rct::rct2pt(amount_commitment));
+    const FcmpRerandomizedOutputCompressed rerandomized_output = fcmp_pp::rerandomize_output(output);
 
     const FcmpInputCompressed recomputed_input = fcmp_pp::calculate_fcmp_input_for_rerandomizations(
         rct::rct2pk(onetime_address),

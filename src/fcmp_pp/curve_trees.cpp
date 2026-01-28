@@ -30,7 +30,6 @@
 
 #include "common/threadpool.h"
 #include "profile_tools.h"
-#include "ringct/rctOps.h"
 #include "string_tools.h"
 
 #include <algorithm>
@@ -71,11 +70,8 @@ OutputTuple output_to_tuple(const OutputPair &output_pair, bool use_fast_check)
     const crypto::public_key &output_pubkey = output_pubkey_cref(output_pair);
     const crypto::ec_point &commitment      = commitment_cref(output_pair);
 
-    const rct::key &O_key = rct::pk2rct(output_pubkey);
-    const rct::key &C_key = rct::pt2rct(commitment);
-
-    rct::key O = O_key;
-    rct::key C = C_key;
+    crypto::ec_point O = output_pubkey;
+    crypto::ec_point C = commitment;
 
     // If the output has already been checked for torsion, then we don't need to clear torsion here
     if (!output_checked_for_torsion(output_pair))
@@ -85,23 +81,23 @@ OutputTuple output_to_tuple(const OutputPair &output_pair, bool use_fast_check)
         // Clear torsion on output if it wasn't already checked for torsion
         if (!use_fast_check)
         {
-            if (!fcmp_pp::get_valid_torsion_cleared_point(O_key, O))
+            if (!fcmp_pp::get_valid_torsion_cleared_point(output_pubkey, O))
                 throw std::runtime_error("O is invalid for insertion to tree");
-            if (!fcmp_pp::get_valid_torsion_cleared_point(C_key, C))
+            if (!fcmp_pp::get_valid_torsion_cleared_point(commitment, C))
                 throw std::runtime_error("C is invalid for insertion to tree");
         }
         else
         {
-            if (!fcmp_pp::get_valid_torsion_cleared_point_fast(O_key, O))
+            if (!fcmp_pp::get_valid_torsion_cleared_point_fast(output_pubkey, O))
                 throw std::runtime_error("O is invalid for insertion to tree");
-            if (!fcmp_pp::get_valid_torsion_cleared_point_fast(C_key, C))
+            if (!fcmp_pp::get_valid_torsion_cleared_point_fast(commitment, C))
                 throw std::runtime_error("C is invalid for insertion to tree");
         }
 
-        if (O != O_key)
-            LOG_PRINT_L2("Output pubkey has torsion: " << O_key);
-        if (C != C_key)
-            LOG_PRINT_L2("Commitment has torsion: " << C_key);
+        if (O != output_pubkey)
+            LOG_PRINT_L2("Output pubkey has torsion: " << output_pubkey);
+        if (C != commitment)
+            LOG_PRINT_L2("Commitment has torsion: " << commitment);
 
         TIME_MEASURE_NS_FINISH(clear_torsion_ns);
 
@@ -111,24 +107,24 @@ OutputTuple output_to_tuple(const OutputPair &output_pair, bool use_fast_check)
 #if !defined(NDEBUG)
     {
         // Debug build safety checks
-        rct::key O_debug;
-        rct::key C_debug;
-        assert(fcmp_pp::get_valid_torsion_cleared_point(O_key, O_debug));
-        assert(fcmp_pp::get_valid_torsion_cleared_point(C_key, C_debug));
+        crypto::ec_point O_debug;
+        crypto::ec_point C_debug;
+        assert(fcmp_pp::get_valid_torsion_cleared_point(output_pubkey, O_debug));
+        assert(fcmp_pp::get_valid_torsion_cleared_point(commitment, C_debug));
         assert(O == O_debug);
         assert(C == C_debug);
     }
 #endif
 
     // Redundant check for safety
-    if (O == rct::I)
+    if (O == crypto::EC_I)
         throw std::runtime_error("O cannot equal identity");
-    if (C == rct::I)
+    if (C == crypto::EC_I)
         throw std::runtime_error("C cannot equal identity");
 
     TIME_MEASURE_NS_START(derive_key_image_generator_ns);
 
-    // Derive key image generator
+    // Derive key image generator using original output pubkey
     crypto::ec_point I;
     crypto::derive_key_image_generator(output_pubkey, use_biased_hash_to_point(output_pair), I);
 
@@ -136,13 +132,7 @@ OutputTuple output_to_tuple(const OutputPair &output_pair, bool use_fast_check)
 
     LOG_PRINT_L3("derive_key_image_generator_ns: " << derive_key_image_generator_ns);
 
-    rct::key I_rct = rct::pt2rct(I);
-
-    return OutputTuple{
-        .O = std::move(O),
-        .I = std::move(I_rct),
-        .C = std::move(C),
-    };
+    return output_tuple_from_bytes(O, I, C);
 }
 //----------------------------------------------------------------------------------------------------------------------
 std::shared_ptr<CurveTreesV1> curve_trees_v1(const std::size_t selene_chunk_width, const std::size_t helios_chunk_width)
@@ -583,15 +573,19 @@ static PreLeafTuple output_tuple_to_pre_leaf_tuple(const OutputTuple &o)
 {
     TIME_MEASURE_NS_START(point_to_ed_derivatives_ns);
 
+    const crypto::ec_point &O = (crypto::ec_point&) o.O;
+    const crypto::ec_point &I = (crypto::ec_point&) o.I;
+    const crypto::ec_point &C = (crypto::ec_point&) o.C;
+
     // TODO: this relatively new point_to_ed_derivatives function introduced a point de-compression in order to get wei
     // y coordinates from the ed x coordinate. It's worth re-investigating the tree building perf hit as a result. The
     // daemon is de-compressing these points twice (once when checking for torsion, and again here).
     PreLeafTuple plt;
-    if (!fcmp_pp::point_to_ed_derivatives(o.O, plt.O_derivatives))
+    if (!fcmp_pp::point_to_ed_derivatives(O, plt.O_derivatives))
         throw std::runtime_error("failed to get ed derivatives from O");
-    if (!fcmp_pp::point_to_ed_derivatives(o.I, plt.I_derivatives))
+    if (!fcmp_pp::point_to_ed_derivatives(I, plt.I_derivatives))
         throw std::runtime_error("failed to get ed derivatives from I");
-    if (!fcmp_pp::point_to_ed_derivatives(o.C, plt.C_derivatives))
+    if (!fcmp_pp::point_to_ed_derivatives(C, plt.C_derivatives))
         throw std::runtime_error("failed to get ed derivatives from C");
 
     TIME_MEASURE_NS_FINISH(point_to_ed_derivatives_ns);
@@ -609,7 +603,7 @@ static PreLeafTuple output_to_pre_leaf_tuple(const OutputPair &output_pair, bool
 //----------------------------------------------------------------------------------------------------------------------
 static CurveTrees<Selene, Helios>::LeafTuple pre_leaf_tuple_to_leaf_tuple(const PreLeafTuple &plt)
 {
-    rct::key O_x, O_y, I_x, I_y, C_x, C_y;
+    crypto::ec_coord O_x, O_y, I_x, I_y, C_x, C_y;
     if (!fcmp_pp::ed_derivatives_to_wei_x_y(plt.O_derivatives, O_x, O_y))
         throw std::runtime_error("failed to get wei x y from O derivatives");
     if (!fcmp_pp::ed_derivatives_to_wei_x_y(plt.I_derivatives, I_x, I_y))
@@ -990,7 +984,7 @@ bool CurveTrees<Selene, Helios>::audit_path(const CurveTrees<Selene, Helios>::Pa
     const auto output_tuple = output_to_tuple(output);
     bool found = false;
     for (std::size_t i = 0; !found && i < leaves.size(); ++i)
-        found = (output_tuple.O == leaves[i].O && output_tuple.I == leaves[i].I && output_tuple.C == leaves[i].C);
+        found = output_tuple == leaves[i];
     CHECK_AND_ASSERT_MES(found, false, "did not find output in chunk of leaves");
 
     // Get all hashes
@@ -1593,11 +1587,11 @@ void CurveTrees<C1, C2>::set_valid_leaves(
                     std::size_t point_idx = i * 2;
                     for (std::size_t j = i; j < end; ++j)
                     {
-                        rct::key wei_x;
-                        rct::key wei_y;
+                        crypto::ec_coord wei_x;
+                        crypto::ec_coord wei_y;
                         fe_ed_derivatives_to_wei_x_y(
-                                wei_x.bytes,
-                                wei_y.bytes,
+                                to_bytes(wei_x),
+                                to_bytes(wei_y),
                                 batch_inv_res[point_idx]/*inv_one_minus_y*/,
                                 one_plus_y_vec[j],
                                 batch_inv_res[point_idx+1]/*inv_one_minus_y_mul_x*/
@@ -1733,20 +1727,12 @@ CurveTrees<Selene, Helios>::PathForProof CurveTrees<Selene, Helios>::path_for_pr
         bool found = false;
         for (const auto &leaf : path.leaves)
         {
-            found = output_tuple.O == leaf.O && output_tuple.I == leaf.I && output_tuple.C == leaf.C;
+            found = output_tuple == leaf;
             if (found)
                 break;
             ++output_idx_in_path;
         }
         CHECK_AND_ASSERT_THROW_MES(found, "failed to find output in path");
-    }
-
-    // Set up OutputBytes compatible with Rust FFI
-    std::vector<fcmp_pp::OutputBytes> output_bytes;
-    {
-        output_bytes.reserve(path.leaves.size());
-        for (const auto &leaf : path.leaves)
-            output_bytes.push_back(leaf.to_output_bytes());
     }
 
     const size_t n_tree_layers = path.c1_layers.size() + path.c2_layers.size();
@@ -1785,7 +1771,7 @@ CurveTrees<Selene, Helios>::PathForProof CurveTrees<Selene, Helios>::path_for_pr
     }
 
     return PathForProof {
-            .leaves           = std::move(output_bytes),
+            .leaves           = path.leaves,
             .output_idx       = output_idx_in_path,
             .c2_scalar_chunks = std::move(c2_scalar_chunks),
             .c1_scalar_chunks = std::move(c1_scalar_chunks),

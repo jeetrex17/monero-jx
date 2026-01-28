@@ -60,6 +60,11 @@ namespace crypto {
     char data[32];
   };
 
+  // x or y coordinate
+  POD_CLASS ec_coord {
+    char data [32];
+  };
+
   POD_CLASS public_key: ec_point {
     friend class crypto_ops;
   };
@@ -344,6 +349,9 @@ namespace crypto {
   inline bool operator>(const public_key &p1, const public_key &p2) { return p2 < p1; }
   inline bool operator<(const key_image &p1, const key_image &p2) { return memcmp(&p1, &p2, sizeof(key_image)) < 0; }
   inline bool operator>(const key_image &p1, const key_image &p2) { return p2 < p1; }
+
+  static const ec_point EC_I = { {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0} };
+  static const ec_point EC_INV_EIGHT = { {121, 47, -36, -30, 41, -27, 6, 97, -48, -38, 28, 125, -77, -99, -45, 7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6} };
 }
 
 // type conversions for easier calls to sc_add(), sc_sub(), hash functions
@@ -351,6 +359,8 @@ inline unsigned char* to_bytes(crypto::ec_scalar &scalar) { return &reinterpret_
 inline const unsigned char* to_bytes(const crypto::ec_scalar &scalar) { return &reinterpret_cast<const unsigned char&>(scalar); }
 inline unsigned char* to_bytes(crypto::ec_point &point) { return &reinterpret_cast<unsigned char&>(point); }
 inline const unsigned char* to_bytes(const crypto::ec_point &point) { return &reinterpret_cast<const unsigned char&>(point); }
+inline unsigned char* to_bytes(crypto::ec_coord &coord) { return &reinterpret_cast<unsigned char&>(coord); }
+inline const unsigned char* to_bytes(const crypto::ec_coord &coord) { return &reinterpret_cast<const unsigned char&>(coord); }
 
 CRYPTO_MAKE_HASHABLE(ec_point)
 CRYPTO_MAKE_HASHABLE(public_key)

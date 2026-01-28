@@ -80,28 +80,6 @@ struct GrowLayerInstructions final
     uint64_t next_parent_start_index;
 };
 
-// Ed25519 points (can go from OutputTuple -> LeafTuple)
-struct OutputTuple final
-{
-    rct::key O;
-    rct::key I;
-    rct::key C;
-
-    const OutputBytes to_output_bytes() const
-    {
-        OutputBytes out;
-        memcpy(out.O_bytes, O.bytes, sizeof(O.bytes));
-        memcpy(out.I_bytes, I.bytes, sizeof(I.bytes));
-        memcpy(out.C_bytes, C.bytes, sizeof(C.bytes));
-        static_assert(sizeof(out.O_bytes) == sizeof(O.bytes) &&
-            sizeof(out.I_bytes) == sizeof(I.bytes) &&
-            sizeof(out.C_bytes) == sizeof(C.bytes),
-            "unexpected size mismatch on O, I, C");
-        static_assert(sizeof(OutputBytes) == (3 * sizeof(rct::key)), "unexpected size of OutputBytes");
-        return out;
-    }
-};
-
 // Struct composed of ec elems needed to get a full-fledged leaf tuple
 struct PreLeafTuple final
 {
@@ -259,7 +237,7 @@ public:
     // A path ready to be used to construct an FCMP++ proof
     struct PathForProof final
     {
-        std::vector<fcmp_pp::OutputBytes> leaves;
+        std::vector<fcmp_pp::OutputTuple> leaves;
         std::size_t output_idx;
         std::vector<std::vector<typename C2::Scalar>> c2_scalar_chunks;
         std::vector<std::vector<typename C1::Scalar>> c1_scalar_chunks;

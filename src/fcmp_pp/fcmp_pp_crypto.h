@@ -32,7 +32,7 @@ extern "C"
 {
 #include "crypto/crypto-ops.h"
 }
-#include "ringct/rctTypes.h"
+#include "crypto/crypto.h"
 
 namespace fcmp_pp
 {
@@ -49,12 +49,12 @@ struct EdDerivatives final
 bool sqrt(fe y, const fe x);
 bool mul8_is_identity(const ge_p3 &point);
 bool torsion_check_vartime(const ge_p3 &point);
-rct::key clear_torsion(const ge_p3 &point);
-bool get_valid_torsion_cleared_point(const rct::key &point, rct::key &torsion_cleared_out);
-bool get_valid_torsion_cleared_point_fast(const rct::key &point, rct::key &torsion_cleared_out);
-bool point_to_ed_derivatives(const rct::key &pub, EdDerivatives &ed_derivatives);
-bool ed_derivatives_to_wei_x_y(const EdDerivatives &ed_derivatives, rct::key &wei_x, rct::key &wei_y);
-bool point_to_wei_x(const rct::key &pub, rct::key &wei_x);
+crypto::ec_point clear_torsion(const ge_p3 &point);
+bool get_valid_torsion_cleared_point(const crypto::ec_point &point, crypto::ec_point &torsion_cleared_out);
+bool get_valid_torsion_cleared_point_fast(const crypto::ec_point &point, crypto::ec_point &torsion_cleared_out);
+bool point_to_ed_derivatives(const crypto::ec_point &pub, EdDerivatives &ed_derivatives);
+bool ed_derivatives_to_wei_x_y(const EdDerivatives &ed_derivatives, crypto::ec_coord &wei_x, crypto::ec_coord &wei_y);
+bool point_to_wei_x(const crypto::ec_point &pub, crypto::ec_coord &wei_x);
 /**
  * brief - scalarmult_and_add - Q = P + a * A
  */

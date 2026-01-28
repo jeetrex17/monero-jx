@@ -35,6 +35,24 @@ namespace fcmp_pp
 {
 //----------------------------------------------------------------------------------------------------------------------
 //----------------------------------------------------------------------------------------------------------------------
+// Helpers
+//----------------------------------------------------------------------------------------------------------------------
+OutputTuple output_tuple_from_bytes(const crypto::ec_point &O, const crypto::ec_point &I, const crypto::ec_point &C)
+{
+    OutputTuple output_tuple;
+
+    static_assert(sizeof(output_tuple.O) == sizeof(O), "unexpected sizeof O");
+    static_assert(sizeof(output_tuple.I) == sizeof(I), "unexpected sizeof I");
+    static_assert(sizeof(output_tuple.C) == sizeof(C), "unexpected sizeof C");
+
+    memcpy(output_tuple.O, &O, sizeof(O));
+    memcpy(output_tuple.I, &I, sizeof(I));
+    memcpy(output_tuple.C, &C, sizeof(C));
+
+    return output_tuple;
+}
+//----------------------------------------------------------------------------------------------------------------------
+//----------------------------------------------------------------------------------------------------------------------
 // FFI types
 //----------------------------------------------------------------------------------------------------------------------
 #define CHECK_FFI_RES \

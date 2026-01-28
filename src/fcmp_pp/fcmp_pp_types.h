@@ -68,8 +68,10 @@ struct HeliosT final
     using ScalarChunks = ::HeliosScalarChunks;
 };
 //----------------------------------------------------------------------------------------------------------------------
-using OutputBytes = ::OutputBytes;
+using OutputTuple = ::OutputTuple;
 using OutputChunk = ::OutputSlice;
+//----------------------------------------------------------------------------------------------------------------------
+OutputTuple output_tuple_from_bytes(const crypto::ec_point &O, const crypto::ec_point &I, const crypto::ec_point &C);
 //----------------------------------------------------------------------------------------------------------------------
 // Define C++ type here so it can be used in FFI types
 using FcmpPpProof = std::vector<uint8_t>;
@@ -233,3 +235,11 @@ FcmpPpProof fcmp_pp_proof_from_parts_v1(const std::vector<FcmpRerandomizedOutput
 //----------------------------------------------------------------------------------------------------------------------
 //----------------------------------------------------------------------------------------------------------------------
 }//namespace fcmp_pp
+
+inline bool operator==(const fcmp_pp::OutputTuple &a, const fcmp_pp::OutputTuple &b)
+{
+    return
+        (memcmp(a.O, b.O, sizeof(a.O)) == 0) &&
+        (memcmp(a.I, b.I, sizeof(a.I)) == 0) &&
+        (memcmp(a.C, b.C, sizeof(a.C)) == 0);
+}

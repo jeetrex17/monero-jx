@@ -70,11 +70,11 @@ struct SelenePoint {
 
 // ----- End deps C bindings -----
 
-struct OutputBytes
+struct OutputTuple
 {
-  uint8_t O_bytes[32];
-  uint8_t I_bytes[32];
-  uint8_t C_bytes[32];
+  uint8_t O[32];
+  uint8_t I[32];
+  uint8_t C[32];
 };
 
 struct FcmpInputCompressed
@@ -113,7 +113,7 @@ struct SeleneScalarSlice
 
 struct OutputSlice
 {
-  const struct OutputBytes *buf;
+  const struct OutputTuple *buf;
   uintptr_t len;
 };
 
@@ -237,7 +237,7 @@ int path_new(struct OutputSlice leaves,
 
 void destroy_path(struct PathUnsafe *path);
 
-int rerandomize_output(struct OutputBytes output,
+int rerandomize_output(struct OutputTuple output,
                                             struct FcmpRerandomizedOutputCompressed *rerandomized_output_out);
 
 int o_blind(const struct FcmpRerandomizedOutputCompressed *rerandomized_output,
