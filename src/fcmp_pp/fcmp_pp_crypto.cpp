@@ -30,7 +30,7 @@
 
 #include "misc_log_ex.h"
 
-#include <stdlib.h>
+#include <memory>
 
 // static void print_bytes(const fe f)
 // {
@@ -365,20 +365,16 @@ bool point_to_ed_derivatives(const crypto::ec_point &pub, EdDerivatives &ed_deri
 }
 //----------------------------------------------------------------------------------------------------------------------
 bool ed_derivatives_to_wei_x_y(const EdDerivatives &ed_derivatives, crypto::ec_coord &wei_x, crypto::ec_coord &wei_y) {
-    // Get inverse of (1-y) and ((1-y)*x)
-    fe *fe_batch = (fe *) malloc(2 * sizeof(fe));
-    if (!fe_batch)
-        return false;
+    static const int N_ELEMS = 2;
 
-    fe *inv_res = (fe *) malloc(2 * sizeof(fe));
-    if (!inv_res)
-        return false;
+    // Get inverse of (1-y) and ((1-y)*x)
+    std::unique_ptr<fe[]> fe_batch = std::make_unique<fe[]>(N_ELEMS);
+    std::unique_ptr<fe[]> inv_res = std::make_unique<fe[]>(N_ELEMS);
 
     memcpy(&fe_batch[0], &ed_derivatives.one_minus_y, sizeof(fe));
     memcpy(&fe_batch[1], &ed_derivatives.one_minus_y_mul_x, sizeof(fe));
 
-    if (fe_batch_invert(inv_res, fe_batch, 2) != 0)
-        return false;
+    fe_batch_invert(inv_res.get(), fe_batch.get(), N_ELEMS);
 
     fe_ed_derivatives_to_wei_x_y(
         to_bytes(wei_x),
@@ -386,9 +382,6 @@ bool ed_derivatives_to_wei_x_y(const EdDerivatives &ed_derivatives, crypto::ec_c
         inv_res[0]/*(1/(1-y))*/,
         ed_derivatives.one_plus_y,
         inv_res[1]/*(1/((1-y)*x))*/);
-
-    free(fe_batch);
-    free(inv_res);
 
     return true;
 }

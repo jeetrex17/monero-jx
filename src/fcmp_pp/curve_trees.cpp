@@ -34,7 +34,6 @@
 #include "string_tools.h"
 
 #include <algorithm>
-#include <stdlib.h>
 
 namespace
 {
@@ -1582,16 +1581,10 @@ void CurveTrees<C1, C2>::set_valid_leaves(
     const std::size_t n_valid_outputs = std::count(valid_outputs.begin(), valid_outputs.end(), True);
     const std::size_t n_valid_leaf_points = n_valid_outputs * LEAF_TUPLE_POINTS;
 
-    // Collecting (1+y)'s
-    fe *one_plus_y_vec = (fe *) malloc(n_valid_leaf_points * sizeof(fe));
-    CHECK_AND_ASSERT_THROW_MES(one_plus_y_vec, "failed malloc one_plus_y_vec");
-
-    // Collecting (1-y)'s and ((1-y)*x)'s for batch inversion
-    fe *fe_batch = (fe *) malloc(n_valid_leaf_points * sizeof(fe) * 2);
-    CHECK_AND_ASSERT_THROW_MES(fe_batch, "failed malloc fe_batch");
-
-    fe *batch_inv_res = (fe *) malloc(n_valid_leaf_points * sizeof(fe) * 2);
-    CHECK_AND_ASSERT_THROW_MES(batch_inv_res, "failed malloc batch_inv_res");
+    // Collecting [(1+y),(1-y),((1-y)*x)] for batch inversion
+    std::unique_ptr<fe[]> one_plus_y_vec = std::make_unique<fe[]>(n_valid_leaf_points);
+    std::unique_ptr<fe[]> fe_batch       = std::make_unique<fe[]>(n_valid_leaf_points * 2);
+    std::unique_ptr<fe[]> batch_inv_res  = std::make_unique<fe[]>(n_valid_leaf_points * 2);
 
     std::size_t valid_i = 0, batch_i = 0;
     for (std::size_t i = 0; i < valid_outputs.size(); ++i)
@@ -1632,8 +1625,7 @@ void CurveTrees<C1, C2>::set_valid_leaves(
     TIME_MEASURE_START(batch_invert);
     // Step 3. Get batch inverse of all valid (1-y)'s and ((1-y)*x)'s
     // - Batch inversion is significantly faster than inverting 1 at a time
-    CHECK_AND_ASSERT_THROW_MES(fe_batch_invert(batch_inv_res, fe_batch, n_valid_leaf_points * 2) == 0,
-        "failed to batch invert");
+    fe_batch_invert(batch_inv_res.get(), fe_batch.get(), n_valid_leaf_points * 2);
     TIME_MEASURE_FINISH(batch_invert);
 
     TIME_MEASURE_START(get_selene_scalars);
@@ -1693,11 +1685,6 @@ void CurveTrees<C1, C2>::set_valid_leaves(
         // We can derive leaf tuples from output pairs, so we store just the unified output in the db to save 32 bytes
         tuples_out.emplace_back(std::move(new_outputs[i]));
     }
-
-    // Step 6. Clean up
-    free(one_plus_y_vec);
-    free(fe_batch);
-    free(batch_inv_res);
 
     TIME_MEASURE_FINISH(set_valid_leaves);
 
