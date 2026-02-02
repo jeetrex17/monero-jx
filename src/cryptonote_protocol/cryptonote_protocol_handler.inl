@@ -1846,7 +1846,6 @@ skip:
     m_idle_peer_kicker.do_call(boost::bind(&t_cryptonote_protocol_handler<t_core>::kick_idle_peers, this));
     m_standby_checker.do_call(boost::bind(&t_cryptonote_protocol_handler<t_core>::check_standby_peers, this));
     m_sync_search_checker.do_call(boost::bind(&t_cryptonote_protocol_handler<t_core>::update_sync_search, this));
-    m_txpool_complement_checker.do_call(boost::bind(&t_cryptonote_protocol_handler<t_core>::check_txpool_complement, this));
     m_peer_tx_request_checker.do_call(boost::bind(&t_cryptonote_protocol_handler<t_core>::check_tx_request_queue, this));
     return m_core.on_idle();
   }
@@ -2704,7 +2703,20 @@ skip:
     val_expected = true;
     if (m_ask_for_txpool_complement.compare_exchange_strong(val_expected, false))
     {
-      this->check_txpool_complement();
+      m_p2p->for_each_connection([&](cryptonote_connection_context& context, nodetool::peerid_type peer_id, uint32_t support_flags)->bool
+      {
+        if(context.m_state < cryptonote_connection_context::state_synchronizing)
+        {
+          MDEBUG(context << "not ready, ignoring");
+          return true;
+        }
+        if (!request_txpool_complement(context))
+        {
+          MERROR(context << "Failed to request txpool complement");
+          return true;
+        }
+        return false;
+      });
     }
 
     return true;
@@ -2926,32 +2938,6 @@ skip:
        DB twice on received transactions - it is difficult to workaround this
        due to the internal design. */
     return m_p2p->send_txs(std::move(arg.txs), std::move(tx_hashes), zone, source, tx_relay) != epee::net_utils::zone::invalid;
-  }
-  //------------------------------------------------------------------------------------------------------------------------
-  template<class t_core>
-  bool t_cryptonote_protocol_handler<t_core>::check_txpool_complement()
-  {
-    if (!is_synchronized())
-    {
-      MDEBUG("Not ready for txpool complement");
-      return true;
-    }
-
-    m_p2p->for_each_connection([&](cryptonote_connection_context& context, nodetool::peerid_type peer_id, uint32_t support_flags)->bool
-    {
-      if(context.m_state < cryptonote_connection_context::state_synchronizing)
-      {
-        MDEBUG(context << "not ready for txpool complement check");
-        return true;
-      }
-      if (!this->request_txpool_complement(context))
-      {
-        MERROR(context << "Failed to request txpool complement");
-        return true;
-      }
-      return false;
-    });
-    return true;
   }
   //------------------------------------------------------------------------------------------------------------------------
   template<class t_core>

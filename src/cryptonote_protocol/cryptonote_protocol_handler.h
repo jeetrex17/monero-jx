@@ -182,7 +182,6 @@ namespace cryptonote
     bool kick_idle_peers();
     bool check_standby_peers();
     bool update_sync_search();
-    bool check_txpool_complement();
     void send_txs_request(cryptonote_connection_context &context, std::vector<crypto::hash> &&tx_hashes);
     std::mutex m_check_tx_request_queue_mutex;
     bool check_tx_request_queue();
@@ -209,7 +208,6 @@ namespace cryptonote
     epee::math_helper::once_a_time_milliseconds<100> m_standby_checker;
     epee::math_helper::once_a_time_seconds<101> m_sync_search_checker;
     epee::math_helper::once_a_time_seconds<43> m_bad_peer_checker;
-    epee::math_helper::once_a_time_seconds<300> m_txpool_complement_checker;
     epee::math_helper::once_a_time_seconds<5> m_peer_tx_request_checker;
     std::unordered_map<epee::net_utils::zone, unsigned int> m_max_out_peers;
     mutable epee::critical_section m_max_out_peers_lock;

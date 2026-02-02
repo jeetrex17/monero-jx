@@ -829,10 +829,10 @@ namespace cryptonote
             break;
           default:
           case relay_method::none:
-          case relay_method::fluff:
-          case relay_method::block:
             return true;
           case relay_method::local:
+          case relay_method::fluff:
+          case relay_method::block:
             if (now - meta.last_relayed_time <= get_relay_delay(meta.last_relayed_time, meta.receive_time))
               return true; // continue to next tx
             break;
