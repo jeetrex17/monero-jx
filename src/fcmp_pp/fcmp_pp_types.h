@@ -477,6 +477,8 @@ FcmpPpProof fcmp_pp_proof_from_parts_v1(const std::vector<FcmpRerandomizedOutput
 
 inline bool operator==(const fcmp_pp::OutputTuple &a, const fcmp_pp::OutputTuple &b)
 {
+    static_assert(sizeof(fcmp_pp::OutputTuple) == (sizeof(a.O) + sizeof(a.I) + sizeof(a.C)),
+        "unexpected sizeof OutputTuple for == implementation");
     return
         (memcmp(a.O, b.O, sizeof(a.O)) == 0) &&
         (memcmp(a.I, b.I, sizeof(a.I)) == 0) &&
