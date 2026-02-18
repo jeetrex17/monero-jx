@@ -187,6 +187,8 @@ void fe_tobytes(unsigned char *, const fe);
 void fe_copy(fe h, const fe f);
 int fe_isnegative(const fe f);
 void fe_invert(fe out, const fe z);
+int fe_equals(const fe a, const fe b);
+
 /**
 @brief: out[i] = 1/in[i] for i in [0, n). Uses Montgomery's trick
 @return: 0 on success, some other value otherwise
