@@ -30,8 +30,6 @@
 
 #include <assert.h>
 #include <stdint.h>
-#include <stdlib.h>
-#include <string.h>
 
 #include "warnings.h"
 #include "crypto-ops.h"
@@ -316,35 +314,38 @@ void fe_invert(fe out, const fe z) {
 
 // Montgomery's trick
 // https://iacr.org/archive/pkc2004/29470042/29470042.pdf 2.2
-int fe_batch_invert(fe *out, const fe *in, const int n) {
+void fe_batch_invert(fe *out, const fe *in, const int n) {
   if (n == 0) {
-    return 0;
+    return;
   }
 
-  // Step 1: collect initial muls
-  fe *init_muls = (fe *) malloc(n * sizeof(fe));
-  if (!init_muls) {
-    return 1;
+  assert(out);
+  assert(in);
+#ifndef NDEBUG
+  {
+    // Overlap of `out` and `in` sections not allowed
+    const fe *pmin = out < in ? out : in;
+    const fe *pmax = out > in ? out : in;
+    assert(pmin + n < pmax);
   }
-  memcpy(&init_muls[0], &in[0], sizeof(fe));
+#endif
+
+  // Step 1: collect initial muls
+  fe_copy(out[0], in[0]);
   for (int i = 1; i < n; ++i) {
-    fe_mul(init_muls[i], init_muls[i-1], in[i]);
+    fe_mul(out[i], out[i-1], in[i]);
   }
 
   // Step 2: get the inverse of all elems multiplied together
   fe a;
-  fe_invert(a, init_muls[n-1]);
+  fe_invert(a, out[n-1]);
 
   // Step 3: get each inverse
   for (int i = n; i > 1; --i) {
-    fe_mul(out[i-1], a, init_muls[i-2]);
+    fe_mul(out[i-1], a, out[i-2]);
     fe_mul(a, a, in[i-1]);
   }
-  memcpy(&out[0], &a, sizeof(fe));
-
-  free(init_muls);
-
-  return 0;
+  fe_copy(out[0], a);
 }
 
 /* From fe_isnegative.c */

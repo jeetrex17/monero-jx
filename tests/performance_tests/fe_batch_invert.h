@@ -1,4 +1,4 @@
-// Copyright (c) 2024, The Monero Project
+// Copyright (c) 2025, The Monero Project
 // 
 // All rights reserved.
 // 
@@ -30,6 +30,8 @@
 
 #pragma once
 
+#include <memory>
+
 #include "crypto/crypto.h"
 
 template<bool batched>
@@ -41,7 +43,7 @@ public:
 
   bool init()
   {
-    m_fes = (fe *) malloc(n_elems * sizeof(fe));
+    m_fes = std::make_unique<fe[]>(n_elems);
 
     for (std::size_t i = 0; i < n_elems; ++i)
     {
@@ -59,21 +61,19 @@ public:
 
   bool test()
   {
-    fe *inv_fes = (fe *) malloc(n_elems * sizeof(fe));
+    std::unique_ptr<fe[]> inv_fes = std::make_unique<fe[]>(n_elems);
 
-    if (batched)
-      fe_batch_invert(inv_fes, m_fes, n_elems);
+    if constexpr (batched)
+      fe_batch_invert(inv_fes.get(), m_fes.get(), n_elems);
     else
     {
       for (std::size_t i = 0; i < n_elems; ++i)
         fe_invert(inv_fes[i], m_fes[i]);
     }
 
-    free(inv_fes);
-
     return true;
   }
 
 private:
-  fe *m_fes;
+  std::unique_ptr<fe[]> m_fes;
 };
