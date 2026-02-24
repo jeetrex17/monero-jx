@@ -460,14 +460,8 @@ TEST(Crypto, fe_constants)
 
 TEST(Crypto, ec_constants_rct_parity)
 {
-  struct ec_rct_pair_t { crypto::ec_point ec; rct::key rct; };
-  const std::vector<ec_rct_pair_t> constants{
-    {crypto::EC_I,         rct::I},
-    {crypto::EC_INV_EIGHT, rct::INV_EIGHT}
-  };
-
-  for (const auto &pair : constants)
-    ASSERT_TRUE(memcmp(&pair.ec, &pair.rct, 32) == 0);
+  ASSERT_TRUE(memcmp(&crypto::EC_I,         &rct::I,         32) == 0);
+  ASSERT_TRUE(memcmp(&crypto::EC_INV_EIGHT, &rct::INV_EIGHT, 32) == 0);
 }
 
 TEST(Crypto, torsion_check_pass_random)
