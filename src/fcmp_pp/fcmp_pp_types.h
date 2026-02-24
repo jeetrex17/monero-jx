@@ -454,12 +454,6 @@ struct ProofInput final
     std::vector<HeliosBranchBlind> helios_branch_blinds;
 };
 
-struct ProofParams final
-{
-    uint64_t reference_block;
-    std::vector<ProofInput> proof_inputs;
-};
-
 struct FcmpVerifyHelperData final
 {
     TreeRootShared tree_root;

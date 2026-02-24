@@ -668,7 +668,6 @@ namespace cryptonote
      crypto::secret_key tx_key;
      std::vector<crypto::secret_key> additional_tx_keys;
      std::vector<tx_destination_entry> destinations_copy = destinations;
-     fcmp_pp::ProofParams fcmp_pp_params = {};
      return construct_tx_and_get_tx_key(sender_account_keys, subaddresses, sources, destinations_copy, change_addr, extra, tx, tx_key, additional_tx_keys, false, { rct::RangeProofBorromean, 0});
   }
   //---------------------------------------------------------------
