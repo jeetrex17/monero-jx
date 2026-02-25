@@ -32,6 +32,8 @@
 //local headers
 #include "carrot_core/address_utils.h"
 #include "carrot_core/exceptions.h"
+#include "crypto/crypto.h"
+#include "crypto/generators.h"
 extern "C"
 {
 #include "crypto/crypto-ops.h"
@@ -122,7 +124,9 @@ void cryptonote_hierarchy_address_device::get_address_pubkeys(const subaddress_i
 {
     this->assert_derive_type(subaddr_index, "get_address_pubkeys");
     this->get_address_spend_pubkey(subaddr_index, address_spend_pubkey_out);
-    this->m_k_view_incoming_dev->view_key_scalar_mult_ed25519(address_spend_pubkey_out, address_view_pubkey_out);
+    const crypto::public_key view_base_pubkey = subaddr_index.index.is_subaddress()
+        ? address_spend_pubkey_out : crypto::get_G();
+    this->m_k_view_incoming_dev->view_key_scalar_mult_ed25519(view_base_pubkey, address_view_pubkey_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void cryptonote_hierarchy_address_device::get_address_openings(const subaddress_index_extended &subaddr_index,
