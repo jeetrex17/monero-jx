@@ -29,14 +29,12 @@
 #pragma once
 
 #include "crypto/crypto.h"
-#include "fcmp_pp_crypto.h"
 #include "fcmp_pp_types.h"
 #include "misc_log_ex.h"
-#include "serialization/keyvalue_serialization.h"
 #include "tower_cycle.h"
 
-#include <map>
 #include <memory>
+#include <unordered_map>
 #include <vector>
 
 
@@ -45,6 +43,8 @@ namespace fcmp_pp
 namespace curve_trees
 {
 //----------------------------------------------------------------------------------------------------------------------
+//----------------------------------------------------------------------------------------------------------------------
+// Curve Trees type defs
 //----------------------------------------------------------------------------------------------------------------------
 // A layer of contiguous hashes starting from a specific start_idx in the tree
 template<typename C>
@@ -79,73 +79,7 @@ struct GrowLayerInstructions final
     // The parent's starting index in the layer
     uint64_t next_parent_start_index;
 };
-
-// Ed25519 points (can go from OutputTuple -> LeafTuple)
-struct OutputTuple final
-{
-    rct::key O;
-    rct::key I;
-    rct::key C;
-
-    const OutputBytes to_output_bytes() const
-    {
-        OutputBytes out;
-        memcpy(out.O_bytes, O.bytes, sizeof(O.bytes));
-        memcpy(out.I_bytes, I.bytes, sizeof(I.bytes));
-        memcpy(out.C_bytes, C.bytes, sizeof(C.bytes));
-        static_assert(sizeof(out.O_bytes) == sizeof(O.bytes) &&
-            sizeof(out.I_bytes) == sizeof(I.bytes) &&
-            sizeof(out.C_bytes) == sizeof(C.bytes),
-            "unexpected size mismatch on O, I, C");
-        static_assert(sizeof(OutputBytes) == (3 * sizeof(rct::key)), "unexpected size of OutputBytes");
-        return out;
-    }
-};
-
-// Struct composed of ec elems needed to get a full-fledged leaf tuple
-struct PreLeafTuple final
-{
-    fcmp_pp::EdDerivatives O_derivatives;
-    fcmp_pp::EdDerivatives I_derivatives;
-    fcmp_pp::EdDerivatives C_derivatives;
-};
-
-struct ChunkBytes final
-{
-    std::vector<crypto::ec_point> chunk_bytes;
-
-    bool operator==(const ChunkBytes &other) const { return chunk_bytes == other.chunk_bytes; }
-
-    BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE_CONTAINER_POD_AS_BLOB(chunk_bytes)
-    END_KV_SERIALIZE_MAP()
-};
-
-struct PathBytes final
-{
-    std::vector<UnifiedOutput> leaves;
-    std::vector<ChunkBytes> layer_chunks;
-
-    bool operator==(const PathBytes &other) const {return leaves == other.leaves && layer_chunks == other.layer_chunks;}
-
-    BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE_CONTAINER_POD_AS_BLOB(leaves)
-        KV_SERIALIZE(layer_chunks)
-    END_KV_SERIALIZE_MAP()
-};
-
-// The indexes in the tree of a leaf's path elems containing whole chunks at each layer
-// - leaf_range refers to a complete chunk of leaves
-struct PathIndexes final
-{
-    using StartIdx = uint64_t;
-    using EndIdxExclusive = uint64_t;
-    using Range = std::pair<StartIdx, EndIdxExclusive>;
-
-    Range leaf_range;
-    std::vector<Range> layers;
-};
-
+//----------------------------------------------------------------------------------------------------------------------
 //----------------------------------------------------------------------------------------------------------------------
 // Hash a chunk of new children
 template<typename C>
@@ -190,25 +124,18 @@ public:
         typename C1::Scalar C_x;
         typename C1::Scalar C_y;
     };
-    static const std::size_t LEAF_TUPLE_POINTS = 3;
-    static const std::size_t LEAF_TUPLE_SIZE = LEAF_TUPLE_POINTS * 2;
-    static_assert(sizeof(LeafTuple) == (sizeof(typename C1::Scalar) * LEAF_TUPLE_SIZE), "unexpected LeafTuple size");
 
-    // Contiguous leaves in the tree, starting a specified start_idx in the leaf layer
-    struct Leaves final
-    {
-        // Starting leaf tuple index in the leaf layer
-        uint64_t                   start_leaf_tuple_idx{0};
-        // Contiguous leaves in a tree that start at the start_idx
-        std::vector<UnifiedOutput> tuples;
-    };
+    static const std::size_t LEAF_TUPLE_POINTS = 3;
+    static constexpr std::size_t LEAF_TUPLE_SIZE = LEAF_TUPLE_POINTS * 2;
+
+    static_assert(sizeof(LeafTuple) == (sizeof(typename C1::Scalar) * LEAF_TUPLE_SIZE), "unexpected LeafTuple size");
 
     // A struct useful to extend an existing tree
     // - layers alternate between C1 and C2
     // - c1_layer_extensions[0] is first layer after leaves, then c2_layer_extensions[0], c1_layer_extensions[1], etc
     struct TreeExtension final
     {
-        Leaves                          leaves;
+        ContiguousLeaves    leaves;
         std::vector<LayerExtension<C1>> c1_layer_extensions;
         std::vector<LayerExtension<C2>> c2_layer_extensions;
     };
@@ -234,7 +161,6 @@ public:
     struct Path final
     {
         std::vector<OutputTuple> leaves;
-        // TODO: std::size_t idx_in_leaves;
         std::vector<std::vector<typename C1::Point>> c1_layers;
         std::vector<std::vector<typename C2::Point>> c2_layers;
 
@@ -259,11 +185,12 @@ public:
     // A path ready to be used to construct an FCMP++ proof
     struct PathForProof final
     {
-        std::vector<fcmp_pp::OutputBytes> leaves;
+        std::vector<OutputTuple> leaves;
         std::size_t output_idx;
         std::vector<std::vector<typename C2::Scalar>> c2_scalar_chunks;
         std::vector<std::vector<typename C1::Scalar>> c1_scalar_chunks;
     };
+
 //member functions
 public:
     // Convert output pairs into leaf tuples, from {output pubkey,commitment} -> {O,C} -> {O.x,O.y,I.x,I.y,C.x,C.y}
@@ -280,6 +207,9 @@ public:
         const LastHashes &existing_last_hashes,
         std::vector<std::vector<UnifiedOutput>> &&new_outputs,
         const bool use_fast_torsion_check = false);
+
+    // Compress all the points in the tree extension
+    CompressedTreeExtension compress_tree_extension(TreeExtension &&tree_extension) const;
 
     // Calculate the number of elems in each layer of the tree based on the number of leaf tuples
     std::vector<uint64_t> n_elems_per_layer(const uint64_t n_leaf_tuples) const;
@@ -302,13 +232,13 @@ public:
 
     TreeRootShared get_tree_root_from_bytes(const std::size_t n_layers, const crypto::ec_point &tree_root) const;
 
-    Path path_bytes_to_path(const PathBytes &path_bytes) const;
+    Path path_bytes_to_path(const CompressedPath &path_bytes) const;
 
     PathForProof path_for_proof(const Path &path, const OutputTuple &output_tuple) const;
 
     std::vector<crypto::ec_point> calc_hashes_from_path(const Path &path, const bool replace_last_hash = false) const;
 
-    TreeExtension path_to_tree_extension(const PathBytes &path_bytes, const PathIndexes &path_idxs) const;
+    TreeExtension path_to_tree_extension(const CompressedPath &path_bytes, const PathIndexes &path_idxs) const;
 
     ConsolidatedPaths get_dummy_paths(const std::vector<fcmp_pp::UnifiedOutput> &outputs, uint8_t n_layers) const;
 

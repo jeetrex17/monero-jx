@@ -32,6 +32,7 @@
 #include "cryptonote_basic/cryptonote_format_utils.h"
 #include "curve_trees.h"
 #include "fcmp_pp/curve_trees.h"
+#include "fcmp_pp/fcmp_pp_types.h"
 #include "fcmp_pp/tree_cache.h"
 #include "serialization/binary_utils.h"
 #include "string_tools.h"

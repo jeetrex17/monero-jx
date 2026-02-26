@@ -1147,7 +1147,7 @@ namespace cryptonote
     try
     {
       std::vector<uint64_t> leaf_idxs;
-      std::vector<fcmp_pp::curve_trees::PathBytes> paths;
+      std::vector<fcmp_pp::CompressedPath> paths;
       res.n_leaf_tuples = m_core.get_blockchain_storage().get_db().get_path_by_unified_id(req.unified_ids, req.as_of_n_blocks, leaf_idxs, paths);
       res.paths.reserve(leaf_idxs.size());
       for (std::size_t i = 0; i < leaf_idxs.size(); ++i)

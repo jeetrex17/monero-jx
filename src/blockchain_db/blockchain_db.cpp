@@ -390,8 +390,10 @@ void BlockchainDB::grow_tree(const uint64_t blk_idx, std::vector<fcmp_pp::Unifie
     return;
   }
 
-  const uint64_t new_n_leaf_tuples = tree_extension.leaves.tuples.size() + old_n_leaf_tuples;
-  const auto tree_edge = this->grow_with_tree_extension(tree_extension);
+  const auto compressed_tree_extension = m_curve_trees->compress_tree_extension(std::move(tree_extension));
+  const auto tree_edge = this->grow_with_tree_extension(compressed_tree_extension);
+
+  const uint64_t new_n_leaf_tuples = compressed_tree_extension.leaves.tuples.size() + old_n_leaf_tuples;
   this->save_tree_meta(blk_idx, new_n_leaf_tuples, tree_edge);
 }
 
@@ -452,7 +454,7 @@ void BlockchainDB::trim_tree(const uint64_t new_n_leaf_tuples, const uint64_t tr
   this->trim_layers(new_n_leaf_tuples, n_elems_per_layer, prev_tree_edge, expected_root_idx);
 }
 
-std::pair<uint64_t, fcmp_pp::curve_trees::PathBytes> BlockchainDB::get_last_path(const uint64_t block_idx) const
+std::pair<uint64_t, fcmp_pp::CompressedPath> BlockchainDB::get_last_path(const uint64_t block_idx) const
 {
   LOG_PRINT_L3("BlockchainDB::" << __func__);
 
@@ -475,8 +477,8 @@ std::pair<uint64_t, fcmp_pp::curve_trees::PathBytes> BlockchainDB::get_last_path
   // Use tree edge at the provided block to set the last hash for each layer (so path state reflects old state)
   for (std::size_t i = 0; i < path.layer_chunks.size(); ++i)
   {
-    CHECK_AND_ASSERT_THROW_MES(path.layer_chunks[i].chunk_bytes.size(), "get_last_path: empty path");
-    path.layer_chunks[i].chunk_bytes.back() = tree_edge[i];
+    CHECK_AND_ASSERT_THROW_MES(path.layer_chunks[i].elems.size(), "get_last_path: empty path");
+    path.layer_chunks[i].elems.back() = tree_edge[i];
   }
 
   return { block_n_leaf_tuples, path };
@@ -485,7 +487,7 @@ std::pair<uint64_t, fcmp_pp::curve_trees::PathBytes> BlockchainDB::get_last_path
 uint64_t BlockchainDB::get_path_by_unified_id(const std::vector<uint64_t> &unified_ids,
   const uint64_t as_of_n_blocks,
   std::vector<uint64_t> &leaf_idxs_out,
-  std::vector<fcmp_pp::curve_trees::PathBytes> &paths_out) const
+  std::vector<fcmp_pp::CompressedPath> &paths_out) const
 {
   LOG_PRINT_L3("BlockchainDB::" << __func__);
 
@@ -494,7 +496,7 @@ uint64_t BlockchainDB::get_path_by_unified_id(const std::vector<uint64_t> &unifi
   // Initialize result vectors with 0 values. If outptut is not in the tree,
   // result vectors kept as 0 values
   leaf_idxs_out = std::vector<uint64_t>(unified_ids.size(), 0);
-  paths_out = std::vector<fcmp_pp::curve_trees::PathBytes>(unified_ids.size(), fcmp_pp::curve_trees::PathBytes{});
+  paths_out = std::vector<fcmp_pp::CompressedPath>(unified_ids.size(), fcmp_pp::CompressedPath{});
 
   if (unified_ids.empty())
     return 0;
@@ -599,11 +601,11 @@ uint64_t BlockchainDB::get_path_by_unified_id(const std::vector<uint64_t> &unifi
       if (last_path_idxs.layers.at(i).second != path_idxs.layers.at(i).second)
         continue;
 
-      CHECK_AND_ASSERT_THROW_MES(path.layer_chunks.at(i).chunk_bytes.size(), "get_path_by_unified_id: empty layer in path");
-      CHECK_AND_ASSERT_THROW_MES(path.layer_chunks.at(i).chunk_bytes.size() == last_path.second.layer_chunks.at(i).chunk_bytes.size(),
+      CHECK_AND_ASSERT_THROW_MES(path.layer_chunks.at(i).elems.size(), "get_path_by_unified_id: empty layer in path");
+      CHECK_AND_ASSERT_THROW_MES(path.layer_chunks.at(i).elems.size() == last_path.second.layer_chunks.at(i).elems.size(),
         "get_path_by_unified_id: unexpected size of last path");
 
-      path.layer_chunks.at(i).chunk_bytes.back() = last_path.second.layer_chunks.at(i).chunk_bytes.back();
+      path.layer_chunks.at(i).elems.back() = last_path.second.layer_chunks.at(i).elems.back();
     }
 
     paths_out.at(i) = std::move(path);

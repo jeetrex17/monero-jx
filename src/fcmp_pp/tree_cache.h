@@ -28,12 +28,11 @@
 
 #pragma once
 
-#include "cryptonote_config.h"
-#include "cryptonote_basic/cryptonote_basic.h"
+#include "crypto/crypto.h"
+#include "crypto/hash.h"
 #include "curve_trees.h"
 #include "fcmp_pp_serialization.h"
 #include "fcmp_pp_types.h"
-#include "ringct/rctTypes.h"
 #include "serialization/containers.h"
 #include "serialization/crypto.h"
 #include "serialization/pair.h"
@@ -50,6 +49,8 @@ namespace fcmp_pp
 namespace curve_trees
 {
 //----------------------------------------------------------------------------------------------------------------------
+static const int TREE_CACHE_VERSION = 0;
+
 using BlockIdx  = uint64_t;
 using BlockHash = crypto::hash;
 
@@ -126,9 +127,6 @@ using ChildChunkCache   = std::unordered_map<ChildChunkIdx, CachedTreeElemChunk>
 
 // TODO: technically this can be a vector. There should *always* be at least 1 entry for every layer
 using TreeElemCache     = std::unordered_map<LayerIdx, ChildChunkCache>;
-
-static constexpr int TREE_CACHE_VERSION = 0;
-
 //----------------------------------------------------------------------------------------------------------------------
 //----------------------------------------------------------------------------------------------------------------------
 // Syncs the tree and keeps a user's known received outputs up to date, all saved in memory.
@@ -179,7 +177,7 @@ public:
     void init(const uint64_t start_block_idx,
         const crypto::hash &start_block_hash,
         const uint64_t n_leaf_tuples,
-        const fcmp_pp::curve_trees::PathBytes &last_path,
+        const fcmp_pp::CompressedPath &last_path,
         const OutsByLastLockedBlock &timelocked_outputs);
 
     // TODO: make this part of the TreeSync interface
@@ -234,7 +232,7 @@ public:
     // Force add a path to the cache without re-constructing it via sync
     void force_add_output_path(const OutputPair &output,
         const LeafIdx leaf_idx,
-        const PathBytes &path_bytes,
+        const CompressedPath &path_bytes,
         const uint64_t n_leaf_tuples);
 
 // Internal helper functions
@@ -268,6 +266,8 @@ private:
     // Used for getting tree extensions when growing and for trimming
     // - These are unspecific to the wallet's registered outputs. These are strictly necessary to ensure we can rebuild
     //   the tree extensions (and trim backwards) for each block correctly locally when syncing.
+    // - It's possible for m_cached_blocks.size() > m_max_reorg_depth if the max reorg depth changes across runs.
+    //   This is ok as implemented. m_cached_blocks.size() will stay constant while syncing in this case.
     std::deque<BlockMeta> m_cached_blocks;
 
     mutable uint64_t m_getting_unlocked_outs_ms{0};
@@ -285,8 +285,6 @@ public:
         FIELD(m_leaf_cache)
         FIELD(m_tree_elem_cache)
         FIELD(m_cached_blocks)
-        // It's possible for m_cached_blocks.size() > m_max_reorg_depth if the max reorg depth changes across runs.
-        // This is ok as implemented. m_cached_blocks.size() will stay constant while syncing in this case.
     END_SERIALIZE()
 };
 

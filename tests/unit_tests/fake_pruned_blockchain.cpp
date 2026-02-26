@@ -88,15 +88,8 @@ static bool compare_curve_chunks(const std::vector<std::vector<typename C::Point
 }
 //----------------------------------------------------------------------------------------------------------------------
 //----------------------------------------------------------------------------------------------------------------------
-static bool compare_output_tuple(const fcmp_pp::curve_trees::OutputTuple &tup1,
-    const fcmp_pp::curve_trees::OutputTuple &tup2)
-{
-    return tup1.O == tup2.O && tup1.I == tup2.I && tup1.C == tup2.C;
-}
-//----------------------------------------------------------------------------------------------------------------------
-//----------------------------------------------------------------------------------------------------------------------
-static bool compare_leaf_layer(const std::vector<fcmp_pp::curve_trees::OutputTuple> &leaves1,
-    const std::vector<fcmp_pp::curve_trees::OutputTuple> &leaves2)
+static bool compare_leaf_layer(const std::vector<fcmp_pp::OutputTuple> &leaves1,
+    const std::vector<fcmp_pp::OutputTuple> &leaves2)
 {
     MDEBUG("compare_leaf_layer: " << leaves1.size() << " vs " << leaves2.size());
     if (leaves1.size() != leaves2.size())
@@ -105,7 +98,7 @@ static bool compare_leaf_layer(const std::vector<fcmp_pp::curve_trees::OutputTup
     for (size_t i = 0; i < leaves1.size(); ++i)
     {
         MDEBUG("    Leaf O: " << leaves1.at(i).O << " vs " << leaves2.at(i).O);
-        if (!compare_output_tuple(leaves1.at(i), leaves2.at(i)))
+        if (!(leaves1.at(i) == leaves2.at(i)))
             r = false;
     }
     return r;

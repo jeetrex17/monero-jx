@@ -129,8 +129,8 @@ public:
   virtual std::vector<crypto::ec_point> get_tree_edge(uint64_t block_id) const override { return {}; };
   virtual void save_tree_meta(const uint64_t block_idx, const uint64_t n_leaf_tuples, const std::vector<crypto::ec_point> &tree_edge) override {};
   virtual void del_tree_meta(const uint64_t block_idx) override {};
-  virtual std::vector<crypto::ec_point> grow_with_tree_extension(const fcmp_pp::curve_trees::CurveTreesV1::TreeExtension &tree_extension) override { return std::vector<crypto::ec_point>{}; };
-  virtual fcmp_pp::curve_trees::PathBytes get_path(const fcmp_pp::curve_trees::PathIndexes &path_indexes) const override { return fcmp_pp::curve_trees::PathBytes{}; };
+  virtual std::vector<crypto::ec_point> grow_with_tree_extension(const fcmp_pp::CompressedTreeExtension &tree_extension) override { return std::vector<crypto::ec_point>{}; };
+  virtual fcmp_pp::CompressedPath get_path(const fcmp_pp::PathIndexes &path_indexes) const override { return fcmp_pp::CompressedPath{}; };
   virtual uint64_t find_leaf_idx_by_unified_id_bounded_search(uint64_t unified_id, uint64_t leaf_idx_start, uint64_t leaf_idx_end) const override { return 0; };
   virtual uint64_t trim_leaves(const uint64_t new_n_leaf_tuples, const uint64_t trim_block_idx) override { return 0; };
   virtual void trim_layers(const uint64_t new_n_leaf_tuples, const std::vector<uint64_t> &n_elems_per_layer, const std::vector<crypto::ec_point> &prev_tree_edge, const uint64_t expected_root_idx) override {};

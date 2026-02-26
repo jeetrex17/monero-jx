@@ -31,7 +31,6 @@
 #include "crypto/crypto.h"
 #include "fcmp_pp_rust/fcmp++.h"
 #include "fcmp_pp_types.h"
-#include "ringct/rctTypes.h"
 
 #include <string>
 
@@ -136,7 +135,7 @@ public:
 };
 //----------------------------------------------------------------------------------------------------------------------
 //----------------------------------------------------------------------------------------------------------------------
-SeleneScalar selene_scalar_from_bytes(const rct::key &scalar);
+SeleneScalar selene_scalar_from_bytes(const crypto::ec_coord &bytes);
 //----------------------------------------------------------------------------------------------------------------------
 template<typename C>
 void extend_zeroes(const std::unique_ptr<C> &curve,

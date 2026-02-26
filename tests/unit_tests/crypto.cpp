@@ -458,6 +458,12 @@ TEST(Crypto, fe_constants)
   ASSERT_TRUE(memcmp(fe_c,       c,           sizeof(fe)) == 0);
 }
 
+TEST(Crypto, ec_constants_rct_parity)
+{
+  ASSERT_TRUE(memcmp(&crypto::EC_I,         &rct::I,         32) == 0);
+  ASSERT_TRUE(memcmp(&crypto::EC_INV_EIGHT, &rct::INV_EIGHT, 32) == 0);
+}
+
 TEST(Crypto, torsion_check_pass_random)
 {
   for (int i = 0; i < 1000; ++i)
@@ -469,8 +475,8 @@ TEST(Crypto, torsion_check_pass_random)
     ASSERT_TRUE(rct::isInMainSubgroup(k));
     ASSERT_FALSE(fcmp_pp::mul8_is_identity(x));
     ASSERT_TRUE(fcmp_pp::torsion_check_vartime(x));
-    const rct::key cleared = fcmp_pp::clear_torsion(x);
-    ASSERT_EQ(k, cleared);
+    const crypto::ec_point cleared = fcmp_pp::clear_torsion(x);
+    ASSERT_EQ(rct::rct2pt(k), cleared);
   }
 }
 
@@ -492,8 +498,8 @@ TEST(Crypto, torsion_check_pass_hardcoded)
     ASSERT_TRUE(rct::isInMainSubgroup(k));
     ASSERT_FALSE(fcmp_pp::mul8_is_identity(x));
     ASSERT_TRUE(fcmp_pp::torsion_check_vartime(x));
-    const rct::key cleared = fcmp_pp::clear_torsion(x);
-    ASSERT_EQ(k, cleared);
+    const crypto::ec_point cleared = fcmp_pp::clear_torsion(x);
+    ASSERT_EQ(rct::rct2pt(k), cleared);
   }
 }
 
@@ -506,8 +512,8 @@ TEST(Crypto, torsion_check_torsioned_point)
   ASSERT_FALSE(rct::isInMainSubgroup(k));
   ASSERT_FALSE(fcmp_pp::mul8_is_identity(x));
   ASSERT_FALSE(fcmp_pp::torsion_check_vartime(x));
-  const rct::key cleared = fcmp_pp::clear_torsion(x);
-  ASSERT_NE(k, cleared);
+  const crypto::ec_point cleared = fcmp_pp::clear_torsion(x);
+  ASSERT_NE(rct::rct2pt(k), cleared);
 }
 
 TEST(Crypto, genesis_tx_output_torsion)

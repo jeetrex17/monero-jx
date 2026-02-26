@@ -224,7 +224,7 @@ destroy_fn!(destroy_tree_root, TreeRoot::<Selene, Helios>);
 
 #[allow(non_snake_case)]
 #[repr(C)]
-pub struct OutputBytes {
+pub struct OutputTuple {
     O: [u8; 32],
     I: [u8; 32],
     C: [u8; 32],
@@ -237,7 +237,7 @@ pub struct Slice<T> {
 }
 pub type HeliosScalarSlice = Slice<HeliosScalar>;
 pub type SeleneScalarSlice = Slice<SeleneScalar>;
-pub type OutputSlice = Slice<OutputBytes>;
+pub type OutputSlice = Slice<OutputTuple>;
 pub type HeliosScalarChunks = Slice<HeliosScalarSlice>;
 pub type SeleneScalarChunks = Slice<SeleneScalarSlice>;
 pub type HeliosBranchBlindSlice = Slice<*const BranchBlind<<Helios as Ciphersuite>::G>>;
@@ -338,7 +338,7 @@ pub unsafe extern "C" fn path_new(
     }
 
     // Collect decompressed leaves
-    let leaves_slice: &[OutputBytes] = leaves.into();
+    let leaves_slice: &[OutputTuple] = leaves.into();
     let mut leaves: Vec<Output> = Vec::with_capacity(leaves_slice.len());
     #[allow(non_snake_case)]
     for leaf in leaves_slice {
@@ -412,7 +412,7 @@ destroy_fn!(destroy_path, Path<Curves>);
 #[no_mangle]
 #[allow(non_snake_case)]
 pub unsafe extern "C" fn rerandomize_output(
-    output: OutputBytes,
+    output: OutputTuple,
     rerandomized_output_bytes: *mut u8,
 ) -> c_int {
     let O = if let Some(O) = EdwardsPoint::from_bytes(&output.O).into() {

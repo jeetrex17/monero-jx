@@ -30,14 +30,16 @@
 
 #include <memory>
 #include <type_traits>
+#include <unordered_map>
+#include <utility>
 #include <variant>
 #include <vector>
 
 #include "crypto/crypto.h"
+#include "crypto/hash.h"
+#include "fcmp_pp_crypto.h"
 #include "fcmp_pp_rust/fcmp++.h"
 #include "serialization/keyvalue_serialization.h"
-
-// TODO: consolidate more FCMP++ types into this file
 
 namespace fcmp_pp
 {
@@ -68,10 +70,12 @@ struct HeliosT final
     using ScalarChunks = ::HeliosScalarChunks;
 };
 //----------------------------------------------------------------------------------------------------------------------
-using OutputBytes = ::OutputBytes;
+using OutputTuple = ::OutputTuple;
 using OutputChunk = ::OutputSlice;
 //----------------------------------------------------------------------------------------------------------------------
-// Define C++ type here so it can be used in FFI types
+OutputTuple output_tuple_from_bytes(const crypto::ec_point &O, const crypto::ec_point &I, const crypto::ec_point &C);
+//----------------------------------------------------------------------------------------------------------------------
+// Define FCMP++ prove/verify C++ type here so it can be used in FFI types
 using FcmpPpProof = std::vector<uint8_t>;
 //----------------------------------------------------------------------------------------------------------------------
 //----------------------------------------------------------------------------------------------------------------------
@@ -129,6 +133,8 @@ DEFINE_FCMP_FFI_TYPE(FcmpPpVerifyInput,
 //----------------------------------------------------------------------------------------------------------------------
 //----------------------------------------------------------------------------------------------------------------------
 // C++ types
+//----------------------------------------------------------------------------------------------------------------------
+//   Curve trees types
 //----------------------------------------------------------------------------------------------------------------------
 // Output pub key and commitment, ready to be converted to a leaf tuple
 // - From {output_pubkey,commitment} -> {O,C} -> {O.x,O.y,I.x,I.y,C.x,C.y}
@@ -200,6 +206,77 @@ struct UnifiedOutput final
 #define SIZEOF_SERIALIZED_UNIFIED_OUTPUT 73 // 8+1+32+32
 
 using OutsByLastLockedBlock = std::unordered_map<uint64_t, std::vector<UnifiedOutput>>;
+
+// Contiguous leaves in the tree, starting at a specified start_idx in the leaf layer
+struct ContiguousLeaves final
+{
+    // Starting leaf tuple index in the leaf layer
+    uint64_t                   start_leaf_tuple_idx{0};
+    // Contiguous leaves in a tree that start at the start_idx
+    std::vector<UnifiedOutput> tuples;
+};
+
+/* The "Compressed" prefix means all points contained in the struct are compressed points */
+
+// A layer of contiguous hashes starting from a specific start_idx in the tree
+struct CompressedLayerExtension final
+{
+    uint64_t                      start_idx{0};
+    bool                          update_existing_last_hash;
+    std::vector<crypto::ec_point> hashes;
+};
+
+// A struct useful to extend an existing tree
+// - layers alternate between C1 and C2
+// - layer_extensions[0] is C1 first layer after leaves, then layer_extensions[1] is C2, layer_extensions[2] is C1, etc.
+struct CompressedTreeExtension final
+{
+    ContiguousLeaves leaves;
+    std::vector<CompressedLayerExtension> layer_extensions;
+};
+
+// A chunk in the tree
+struct CompressedChunk final
+{
+    std::vector<crypto::ec_point> elems;
+
+    bool operator==(const CompressedChunk &other) const { return elems == other.elems; }
+
+    // TODO: move to fcmp_pp_serialization.h
+    BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE_CONTAINER_POD_AS_BLOB(elems)
+    END_KV_SERIALIZE_MAP()
+};
+
+// A path in the tree
+struct CompressedPath final
+{
+    std::vector<UnifiedOutput> leaves;
+    std::vector<CompressedChunk> layer_chunks;
+
+    bool operator==(const CompressedPath &other) const
+    {return leaves == other.leaves && layer_chunks == other.layer_chunks;}
+
+    // TODO: move to fcmp_pp_serialization.h
+    BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE_CONTAINER_POD_AS_BLOB(leaves)
+        KV_SERIALIZE(layer_chunks)
+    END_KV_SERIALIZE_MAP()
+};
+
+// The indexes in the tree of a leaf's path elems containing whole chunks at each layer
+// - leaf_range refers to a complete chunk of leaves
+struct PathIndexes final
+{
+    using StartIdx = uint64_t;
+    using EndIdxExclusive = uint64_t;
+    using Range = std::pair<StartIdx, EndIdxExclusive>;
+
+    Range leaf_range;
+    std::vector<Range> layers;
+};
+//----------------------------------------------------------------------------------------------------------------------
+//   FCMP++ prove/verify types
 //----------------------------------------------------------------------------------------------------------------------
 // Byte buffer containing the fcmp++ proof
 using FcmpPpSalProof = std::vector<uint8_t>;
@@ -211,12 +288,6 @@ struct ProofInput final
     OutputBlinds output_blinds;
     std::vector<SeleneBranchBlind> selene_branch_blinds;
     std::vector<HeliosBranchBlind> helios_branch_blinds;
-};
-
-struct ProofParams final
-{
-    uint64_t reference_block;
-    std::vector<ProofInput> proof_inputs;
 };
 
 struct FcmpVerifyHelperData final
@@ -233,3 +304,13 @@ FcmpPpProof fcmp_pp_proof_from_parts_v1(const std::vector<FcmpRerandomizedOutput
 //----------------------------------------------------------------------------------------------------------------------
 //----------------------------------------------------------------------------------------------------------------------
 }//namespace fcmp_pp
+
+inline bool operator==(const fcmp_pp::OutputTuple &a, const fcmp_pp::OutputTuple &b)
+{
+    static_assert(sizeof(fcmp_pp::OutputTuple) == (sizeof(a.O) + sizeof(a.I) + sizeof(a.C)),
+        "unexpected sizeof OutputTuple for == implementation");
+    return
+        (memcmp(a.O, b.O, sizeof(a.O)) == 0) &&
+        (memcmp(a.I, b.I, sizeof(a.I)) == 0) &&
+        (memcmp(a.C, b.C, sizeof(a.C)) == 0);
+}

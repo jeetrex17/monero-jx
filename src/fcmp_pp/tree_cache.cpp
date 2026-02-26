@@ -49,20 +49,20 @@ static OutputRefHash get_output_ref_hash(const OutputPair &o_variant)
     static_assert(sizeof(output_pubkey) == sizeof(commitment), "unexpected size of output pubkey & commitment");
 
     // Hash the type info as well
-    rct::key type = rct::key{};
+    crypto::public_key type = crypto::null_pkey;
     const std::size_t variant_index = o_variant.index();
-    static_assert(sizeof(type.bytes) >= sizeof(variant_index), "variant index type is too large");
-    memcpy(type.bytes, &variant_index, sizeof(variant_index));
+    static_assert(sizeof(type) >= sizeof(variant_index), "variant index type is too large");
+    memcpy(&type, &variant_index, sizeof(variant_index));
 
     static constexpr std::size_t N_HASH_ELEMS = 3;
-    const rct::key data[N_HASH_ELEMS] = {
-            rct::pk2rct(output_pubkey),
-            rct::pt2rct(commitment),
+    const crypto::public_key data[N_HASH_ELEMS] = {
+            output_pubkey,
+            (crypto::public_key&)commitment,
             type
         };
 
     crypto::hash h;
-    crypto::cn_fast_hash(data, N_HASH_ELEMS * sizeof(rct::key), h);
+    crypto::cn_fast_hash(data, N_HASH_ELEMS * sizeof(crypto::public_key), h);
     return h;
 };
 //----------------------------------------------------------------------------------------------------------------------
@@ -185,7 +185,7 @@ static uint64_t remove_outputs_created_at_block(const CreatedBlockIdx &created_b
 template<typename C1, typename C2>
 static void cache_leaf_chunk(const ChildChunkIdx chunk_idx,
     const std::size_t leaf_parent_chunk_width,
-    const typename CurveTrees<C1, C2>::Leaves &leaves,
+    const ContiguousLeaves &leaves,
     const LeafIdx start_leaf_tuple_idx,
     const uint64_t n_leaf_tuples,
     const bool bump_ref_count,
@@ -686,7 +686,7 @@ static void update_registered_path(const std::shared_ptr<CurveTrees<C1, C2>> &cu
 //----------------------------------------------------------------------------------------------------------------------
 template<typename C1, typename C2>
 static void cache_last_chunk_leaves(const std::shared_ptr<CurveTrees<C1, C2>> &curve_trees,
-    const typename CurveTrees<C1, C2>::Leaves &leaves,
+    const ContiguousLeaves &leaves,
     const LeafIdx start_leaf_tuple_idx,
     const uint64_t n_leaf_tuples,
     LeafCache &leaf_cache_inout)
@@ -1215,13 +1215,13 @@ template<typename C1, typename C2>
 void TreeCache<C1, C2>::init(const uint64_t start_block_idx,
     const crypto::hash &start_block_hash,
     const uint64_t n_leaf_tuples,
-    const fcmp_pp::curve_trees::PathBytes &last_path,
+    const fcmp_pp::CompressedPath &last_path,
     const OutsByLastLockedBlock &timelocked_outputs)
 {
     CHECK_AND_ASSERT_THROW_MES(m_cached_blocks.empty(), "expected empty tree cache");
     CHECK_AND_ASSERT_THROW_MES(n_leaf_tuples >= last_path.leaves.size(), "n_leaf_tuples too small");
 
-    fcmp_pp::curve_trees::BlockMeta init_block{
+    BlockMeta init_block{
         .blk_idx       = start_block_idx,
         .blk_hash      = start_block_hash,
         .n_leaf_tuples = n_leaf_tuples,
@@ -1277,7 +1277,7 @@ void TreeCache<C1, C2>::init(const uint64_t start_block_idx,
 template void TreeCache<Selene, Helios>::init(const uint64_t start_block_idx,
     const crypto::hash &start_block_hash,
     const uint64_t n_leaf_tuples,
-    const fcmp_pp::curve_trees::PathBytes &last_hashes,
+    const fcmp_pp::CompressedPath &last_hashes,
     const OutsByLastLockedBlock &timelocked_outputs);
 //----------------------------------------------------------------------------------------------------------------------
 template<typename C1, typename C2>
@@ -1305,7 +1305,7 @@ template void TreeCache<Selene, Helios>::clear();
 template<typename C1, typename C2>
 void TreeCache<C1, C2>::force_add_output_path(const OutputPair &output,
     const LeafIdx leaf_idx,
-    const PathBytes &path_bytes,
+    const CompressedPath &path_bytes,
     const uint64_t n_leaf_tuples)
 {
     MDEBUG("Force adding output " << fcmp_pp::output_pubkey_cref(output)
@@ -1351,7 +1351,7 @@ void TreeCache<C1, C2>::force_add_output_path(const OutputPair &output,
 // Explicit instantiation
 template void TreeCache<Selene, Helios>::force_add_output_path(const OutputPair &output,
     const LeafIdx leaf_idx,
-    const PathBytes &path_bytes,
+    const CompressedPath &path_bytes,
     const uint64_t n_leaf_tuples);
 //----------------------------------------------------------------------------------------------------------------------
 template<typename C1, typename C2>

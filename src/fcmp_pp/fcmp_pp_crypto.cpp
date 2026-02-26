@@ -29,7 +29,6 @@
 #include "fcmp_pp_crypto.h"
 
 #include "misc_log_ex.h"
-#include "ringct/rctOps.h"
 
 #include <stdlib.h>
 
@@ -306,27 +305,27 @@ bool torsion_check_vartime(const ge_p3 &point) {
     return true;
 }
 //----------------------------------------------------------------------------------------------------------------------
-rct::key clear_torsion(const ge_p3 &point) {
+crypto::ec_point clear_torsion(const ge_p3 &point) {
     // mul by inv 8, then mul by 8
     ge_p2 point_inv_8;
-    ge_scalarmult(&point_inv_8, rct::INV_EIGHT.bytes, &point);
+    ge_scalarmult(&point_inv_8, to_bytes(crypto::EC_INV_EIGHT), &point);
     ge_p1p1 point_inv_8_mul_8;
     ge_mul8(&point_inv_8_mul_8, &point_inv_8);
     ge_p3 torsion_cleared_point;
     ge_p1p1_to_p3(&torsion_cleared_point, &point_inv_8_mul_8);
-    rct::key k_out;
-    ge_p3_tobytes(k_out.bytes, &torsion_cleared_point);
+    crypto::ec_point k_out;
+    ge_p3_tobytes(to_bytes(k_out), &torsion_cleared_point);
     return k_out;
 }
 //----------------------------------------------------------------------------------------------------------------------
-bool get_valid_torsion_cleared_point(const rct::key &point, rct::key &torsion_cleared_out) {
+bool get_valid_torsion_cleared_point(const crypto::ec_point &point, crypto::ec_point &torsion_cleared_out) {
     ge_p3 p3;
-    if (ge_frombytes_vartime(&p3, point.bytes) != 0)
+    if (ge_frombytes_vartime(&p3, to_bytes(point)) != 0)
         return false;
     if (mul8_is_identity(p3))
         return false;
     torsion_cleared_out = fcmp_pp::clear_torsion(p3);
-    if (torsion_cleared_out == rct::I)
+    if (torsion_cleared_out == crypto::EC_I)
         return false;
     return true;
 }
@@ -334,26 +333,26 @@ bool get_valid_torsion_cleared_point(const rct::key &point, rct::key &torsion_cl
 // torsion_check_vartime is a risky optimization to avoid needing to clear torsion when not necessary. We label this
 // function "fast" because it uses the optimization. This function should only be used in contexts where the risk is
 // acceptable.
-bool get_valid_torsion_cleared_point_fast(const rct::key &point, rct::key &torsion_cleared_out) {
+bool get_valid_torsion_cleared_point_fast(const crypto::ec_point &point, crypto::ec_point &torsion_cleared_out) {
     ge_p3 p3;
-    if (ge_frombytes_vartime(&p3, point.bytes) != 0)
+    if (ge_frombytes_vartime(&p3, to_bytes(point)) != 0)
         return false;
     if (mul8_is_identity(p3))
         return false;
     torsion_cleared_out = point;
     if (!torsion_check_vartime(p3))
         torsion_cleared_out = fcmp_pp::clear_torsion(p3);
-    if (torsion_cleared_out == rct::I)
+    if (torsion_cleared_out == crypto::EC_I)
         return false;
     return true;
 }
 //----------------------------------------------------------------------------------------------------------------------
-bool point_to_ed_derivatives(const rct::key &pub, EdDerivatives &ed_derivatives) {
-    if (pub == rct::I)
+bool point_to_ed_derivatives(const crypto::ec_point &pub, EdDerivatives &ed_derivatives) {
+    if (pub == crypto::EC_I)
         return false;
     // fe y;
     ge_p3 p3;
-    if (ge_frombytes_vartime(&p3, pub.bytes) != 0)
+    if (ge_frombytes_vartime(&p3, to_bytes(pub)) != 0)
         return false;
     fe one;
     fe_1(one);
@@ -365,7 +364,7 @@ bool point_to_ed_derivatives(const rct::key &pub, EdDerivatives &ed_derivatives)
     return true;
 }
 //----------------------------------------------------------------------------------------------------------------------
-bool ed_derivatives_to_wei_x_y(const EdDerivatives &ed_derivatives, rct::key &wei_x, rct::key &wei_y) {
+bool ed_derivatives_to_wei_x_y(const EdDerivatives &ed_derivatives, crypto::ec_coord &wei_x, crypto::ec_coord &wei_y) {
     // Get inverse of (1-y) and ((1-y)*x)
     fe *fe_batch = (fe *) malloc(2 * sizeof(fe));
     if (!fe_batch)
@@ -382,8 +381,8 @@ bool ed_derivatives_to_wei_x_y(const EdDerivatives &ed_derivatives, rct::key &we
         return false;
 
     fe_ed_derivatives_to_wei_x_y(
-        wei_x.bytes,
-        wei_y.bytes,
+        to_bytes(wei_x),
+        to_bytes(wei_y),
         inv_res[0]/*(1/(1-y))*/,
         ed_derivatives.one_plus_y,
         inv_res[1]/*(1/((1-y)*x))*/);
@@ -394,11 +393,11 @@ bool ed_derivatives_to_wei_x_y(const EdDerivatives &ed_derivatives, rct::key &we
     return true;
 }
 //----------------------------------------------------------------------------------------------------------------------
-bool point_to_wei_x(const rct::key &pub, rct::key &wei_x) {
+bool point_to_wei_x(const crypto::ec_point &pub, crypto::ec_coord &wei_x) {
     EdDerivatives ed_derivatives;
     if (!point_to_ed_derivatives(pub, ed_derivatives))
         return false;
-    rct::key _;
+    crypto::ec_coord _;
     return ed_derivatives_to_wei_x_y(ed_derivatives, wei_x, _);
 }
 //----------------------------------------------------------------------------------------------------------------------

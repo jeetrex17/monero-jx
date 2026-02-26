@@ -372,6 +372,7 @@ typedef struct layer_val {
     uint64_t child_chunk_idx;
     crypto::ec_point child_chunk_hash;
 } layer_val;
+static_assert(sizeof(layer_val) == (8+32), "layer_val unexpected size");
 
 typedef struct mdb_tree_meta {
     uint64_t n_leaf_tuples;
@@ -1427,7 +1428,7 @@ void BlockchainLMDB::del_locked_outs_at_block_idx(uint64_t block_idx)
     throw1(DB_ERROR(lmdb_error("Error removing locked outputs: ", result).c_str()));
 }
 
-std::vector<crypto::ec_point> BlockchainLMDB::grow_with_tree_extension(const fcmp_pp::curve_trees::CurveTreesV1::TreeExtension &tree_extension)
+std::vector<crypto::ec_point> BlockchainLMDB::grow_with_tree_extension(const fcmp_pp::CompressedTreeExtension &tree_extension)
 {
   LOG_PRINT_L3("BlockchainLMDB::" << __func__);
   check_open();
@@ -1452,60 +1453,22 @@ std::vector<crypto::ec_point> BlockchainLMDB::grow_with_tree_extension(const fcm
   }
 
   // Grow the layers
-  const auto &c1_extensions = tree_extension.c1_layer_extensions;
-  const auto &c2_extensions = tree_extension.c2_layer_extensions;
-  const std::size_t n_layers = c1_extensions.size() + c2_extensions.size();
-  if (n_layers == 0)
+  const auto &layer_extensions = tree_extension.layer_extensions;
+  if (layer_extensions.empty())
     throw0(DB_ERROR("Unexpected 0 n layers"));
 
-  bool parent_is_c1 = true;
-  uint64_t c1_idx = 0;
-  uint64_t c2_idx = 0;
   std::vector<crypto::ec_point> tree_edge;
-  tree_edge.reserve(n_layers);
-  for (uint64_t i = 0; i < n_layers; ++i)
+  tree_edge.reserve(layer_extensions.size());
+  for (uint64_t layer_idx = 0; layer_idx < layer_extensions.size(); ++layer_idx)
   {
-    const uint64_t layer_idx = c1_idx + c2_idx;
     MTRACE("Growing layer " << layer_idx);
-
-    if (parent_is_c1)
-    {
-      if (layer_idx % 2 != 0)
-        throw0(DB_ERROR(("Growing odd c1 layer, expected even layer idx for c1: "
-          + std::to_string(layer_idx)).c_str()));
-
-      tree_edge.emplace_back(this->grow_layer<fcmp_pp::curve_trees::Selene>(
-          m_curve_trees->m_c1,
-          c1_extensions.at(c1_idx),
-          layer_idx
-        ));
-
-      ++c1_idx;
-    }
-    else
-    {
-      if (layer_idx % 2 == 0)
-        throw0(DB_ERROR(("Growing even c2 layer, expected odd layer idx for c2: "
-          + std::to_string(layer_idx)).c_str()));
-
-      tree_edge.emplace_back(this->grow_layer<fcmp_pp::curve_trees::Helios>(
-          m_curve_trees->m_c2,
-          c2_extensions.at(c2_idx),
-          layer_idx
-        ));
-
-      ++c2_idx;
-    }
-
-    parent_is_c1 = !parent_is_c1;
+    tree_edge.emplace_back(this->grow_layer(layer_extensions.at(layer_idx), layer_idx));
   }
 
   return tree_edge;
 }
 
-template<typename C>
-crypto::ec_point BlockchainLMDB::grow_layer(const std::unique_ptr<C> &curve,
-  const fcmp_pp::curve_trees::LayerExtension<C> &layer_extension,
+crypto::ec_point BlockchainLMDB::grow_layer(const fcmp_pp::CompressedLayerExtension &layer_extension,
   const uint64_t layer_idx)
 {
   LOG_PRINT_L3("BlockchainLMDB::" << __func__);
@@ -1525,7 +1488,7 @@ crypto::ec_point BlockchainLMDB::grow_layer(const std::unique_ptr<C> &curve,
   // 1. Update the existing last hash if necessary
   if (layer_extension.update_existing_last_hash)
   {
-    hashes.emplace_back(curve->to_bytes(layer_extension.hashes.front()));
+    hashes.emplace_back(layer_extension.hashes.front());
 
     // We updated the last hash, so update it
     layer_val lv;
@@ -1543,7 +1506,7 @@ crypto::ec_point BlockchainLMDB::grow_layer(const std::unique_ptr<C> &curve,
   // 2. Add all the new hashes found in the extension
   for (uint64_t i = layer_extension.update_existing_last_hash ? 1 : 0; i < layer_extension.hashes.size(); ++i)
   {
-    hashes.emplace_back(curve->to_bytes(layer_extension.hashes[i]));
+    hashes.emplace_back(layer_extension.hashes[i]);
 
     layer_val lv;
     lv.child_chunk_idx  = i + layer_extension.start_idx;
@@ -1652,7 +1615,7 @@ std::vector<crypto::ec_point> BlockchainLMDB::get_tree_edge(uint64_t block_id) c
   return res;
 }
 
-fcmp_pp::curve_trees::PathBytes BlockchainLMDB::get_path(const fcmp_pp::curve_trees::PathIndexes &path_indexes) const
+fcmp_pp::CompressedPath BlockchainLMDB::get_path(const fcmp_pp::PathIndexes &path_indexes) const
 {
   LOG_PRINT_L3("BlockchainLMDB::" << __func__);
   check_open();
@@ -1661,7 +1624,7 @@ fcmp_pp::curve_trees::PathBytes BlockchainLMDB::get_path(const fcmp_pp::curve_tr
   RCURSOR(leaves)
   RCURSOR(layers)
 
-  fcmp_pp::curve_trees::PathBytes path_bytes;
+  fcmp_pp::CompressedPath path_bytes;
 
   auto &leaves_out = path_bytes.leaves;
   auto &layer_chunks_out = path_bytes.layer_chunks;
@@ -1705,7 +1668,7 @@ fcmp_pp::curve_trees::PathBytes BlockchainLMDB::get_path(const fcmp_pp::curve_tr
   std::size_t layer_idx = 0;
   for (const auto &layer_idx_range : path_indexes.layers)
   {
-    fcmp_pp::curve_trees::ChunkBytes chunk;
+    fcmp_pp::CompressedChunk chunk;
 
     MDB_val_set(k, layer_idx);
     MDB_val_set(v, layer_idx_range.first);
@@ -1722,7 +1685,7 @@ fcmp_pp::curve_trees::PathBytes BlockchainLMDB::get_path(const fcmp_pp::curve_tr
         throw0(DB_ERROR(lmdb_error("Failed to get layer elem: ", result).c_str()));
 
       auto *lv = (layer_val *)v.mv_data;
-      chunk.chunk_bytes.emplace_back(std::move(lv->child_chunk_hash));
+      chunk.elems.emplace_back(std::move(lv->child_chunk_hash));
     }
 
     layer_chunks_out.emplace_back(std::move(chunk));

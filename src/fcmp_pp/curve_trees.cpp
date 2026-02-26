@@ -29,12 +29,23 @@
 #include "curve_trees.h"
 
 #include "common/threadpool.h"
+#include "fcmp_pp_crypto.h"
 #include "profile_tools.h"
-#include "ringct/rctOps.h"
 #include "string_tools.h"
 
 #include <algorithm>
 #include <stdlib.h>
+
+namespace
+{
+    // Struct composed of ec elems needed to get a full-fledged leaf tuple
+    struct PreLeafTuple final
+    {
+        fcmp_pp::EdDerivatives O_derivatives;
+        fcmp_pp::EdDerivatives I_derivatives;
+        fcmp_pp::EdDerivatives C_derivatives;
+    };
+}
 
 namespace fcmp_pp
 {
@@ -71,11 +82,8 @@ OutputTuple output_to_tuple(const OutputPair &output_pair, bool use_fast_check)
     const crypto::public_key &output_pubkey = output_pubkey_cref(output_pair);
     const crypto::ec_point &commitment      = commitment_cref(output_pair);
 
-    const rct::key &O_key = rct::pk2rct(output_pubkey);
-    const rct::key &C_key = rct::pt2rct(commitment);
-
-    rct::key O = O_key;
-    rct::key C = C_key;
+    crypto::ec_point O = output_pubkey;
+    crypto::ec_point C = commitment;
 
     // If the output has already been checked for torsion, then we don't need to clear torsion here
     if (!output_checked_for_torsion(output_pair))
@@ -85,23 +93,23 @@ OutputTuple output_to_tuple(const OutputPair &output_pair, bool use_fast_check)
         // Clear torsion on output if it wasn't already checked for torsion
         if (!use_fast_check)
         {
-            if (!fcmp_pp::get_valid_torsion_cleared_point(O_key, O))
+            if (!fcmp_pp::get_valid_torsion_cleared_point(output_pubkey, O))
                 throw std::runtime_error("O is invalid for insertion to tree");
-            if (!fcmp_pp::get_valid_torsion_cleared_point(C_key, C))
+            if (!fcmp_pp::get_valid_torsion_cleared_point(commitment, C))
                 throw std::runtime_error("C is invalid for insertion to tree");
         }
         else
         {
-            if (!fcmp_pp::get_valid_torsion_cleared_point_fast(O_key, O))
+            if (!fcmp_pp::get_valid_torsion_cleared_point_fast(output_pubkey, O))
                 throw std::runtime_error("O is invalid for insertion to tree");
-            if (!fcmp_pp::get_valid_torsion_cleared_point_fast(C_key, C))
+            if (!fcmp_pp::get_valid_torsion_cleared_point_fast(commitment, C))
                 throw std::runtime_error("C is invalid for insertion to tree");
         }
 
-        if (O != O_key)
-            LOG_PRINT_L2("Output pubkey has torsion: " << O_key);
-        if (C != C_key)
-            LOG_PRINT_L2("Commitment has torsion: " << C_key);
+        if (O != output_pubkey)
+            LOG_PRINT_L2("Output pubkey has torsion: " << output_pubkey);
+        if (C != commitment)
+            LOG_PRINT_L2("Commitment has torsion: " << commitment);
 
         TIME_MEASURE_NS_FINISH(clear_torsion_ns);
 
@@ -111,24 +119,24 @@ OutputTuple output_to_tuple(const OutputPair &output_pair, bool use_fast_check)
 #if !defined(NDEBUG)
     {
         // Debug build safety checks
-        rct::key O_debug;
-        rct::key C_debug;
-        assert(fcmp_pp::get_valid_torsion_cleared_point(O_key, O_debug));
-        assert(fcmp_pp::get_valid_torsion_cleared_point(C_key, C_debug));
+        crypto::ec_point O_debug;
+        crypto::ec_point C_debug;
+        assert(fcmp_pp::get_valid_torsion_cleared_point(output_pubkey, O_debug));
+        assert(fcmp_pp::get_valid_torsion_cleared_point(commitment, C_debug));
         assert(O == O_debug);
         assert(C == C_debug);
     }
 #endif
 
     // Redundant check for safety
-    if (O == rct::I)
+    if (O == crypto::EC_I)
         throw std::runtime_error("O cannot equal identity");
-    if (C == rct::I)
+    if (C == crypto::EC_I)
         throw std::runtime_error("C cannot equal identity");
 
     TIME_MEASURE_NS_START(derive_key_image_generator_ns);
 
-    // Derive key image generator
+    // Derive key image generator using original output pubkey
     crypto::ec_point I;
     crypto::derive_key_image_generator(output_pubkey, use_biased_hash_to_point(output_pair), I);
 
@@ -136,13 +144,7 @@ OutputTuple output_to_tuple(const OutputPair &output_pair, bool use_fast_check)
 
     LOG_PRINT_L3("derive_key_image_generator_ns: " << derive_key_image_generator_ns);
 
-    rct::key I_rct = rct::pt2rct(I);
-
-    return OutputTuple{
-        .O = std::move(O),
-        .I = std::move(I_rct),
-        .C = std::move(C),
-    };
+    return output_tuple_from_bytes(O, I, C);
 }
 //----------------------------------------------------------------------------------------------------------------------
 std::shared_ptr<CurveTreesV1> curve_trees_v1(const std::size_t selene_chunk_width, const std::size_t helios_chunk_width)
@@ -583,15 +585,19 @@ static PreLeafTuple output_tuple_to_pre_leaf_tuple(const OutputTuple &o)
 {
     TIME_MEASURE_NS_START(point_to_ed_derivatives_ns);
 
+    const crypto::ec_point &O = (crypto::ec_point&) o.O;
+    const crypto::ec_point &I = (crypto::ec_point&) o.I;
+    const crypto::ec_point &C = (crypto::ec_point&) o.C;
+
     // TODO: this relatively new point_to_ed_derivatives function introduced a point de-compression in order to get wei
     // y coordinates from the ed x coordinate. It's worth re-investigating the tree building perf hit as a result. The
     // daemon is de-compressing these points twice (once when checking for torsion, and again here).
     PreLeafTuple plt;
-    if (!fcmp_pp::point_to_ed_derivatives(o.O, plt.O_derivatives))
+    if (!fcmp_pp::point_to_ed_derivatives(O, plt.O_derivatives))
         throw std::runtime_error("failed to get ed derivatives from O");
-    if (!fcmp_pp::point_to_ed_derivatives(o.I, plt.I_derivatives))
+    if (!fcmp_pp::point_to_ed_derivatives(I, plt.I_derivatives))
         throw std::runtime_error("failed to get ed derivatives from I");
-    if (!fcmp_pp::point_to_ed_derivatives(o.C, plt.C_derivatives))
+    if (!fcmp_pp::point_to_ed_derivatives(C, plt.C_derivatives))
         throw std::runtime_error("failed to get ed derivatives from C");
 
     TIME_MEASURE_NS_FINISH(point_to_ed_derivatives_ns);
@@ -609,7 +615,7 @@ static PreLeafTuple output_to_pre_leaf_tuple(const OutputPair &output_pair, bool
 //----------------------------------------------------------------------------------------------------------------------
 static CurveTrees<Selene, Helios>::LeafTuple pre_leaf_tuple_to_leaf_tuple(const PreLeafTuple &plt)
 {
-    rct::key O_x, O_y, I_x, I_y, C_x, C_y;
+    crypto::ec_coord O_x, O_y, I_x, I_y, C_x, C_y;
     if (!fcmp_pp::ed_derivatives_to_wei_x_y(plt.O_derivatives, O_x, O_y))
         throw std::runtime_error("failed to get wei x y from O derivatives");
     if (!fcmp_pp::ed_derivatives_to_wei_x_y(plt.I_derivatives, I_x, I_y))
@@ -827,6 +833,66 @@ template CurveTrees<Selene, Helios>::TreeExtension CurveTrees<Selene, Helios>::g
     const bool use_fast_torsion_check);
 //----------------------------------------------------------------------------------------------------------------------
 template<typename C1, typename C2>
+CompressedTreeExtension CurveTrees<C1, C2>::compress_tree_extension(
+    typename CurveTrees<C1, C2>::TreeExtension &&tree_extension) const
+{
+    std::vector<CompressedLayerExtension> layer_extensions;
+    const std::size_t n_layers = tree_extension.c1_layer_extensions.size() + tree_extension.c2_layer_extensions.size();
+    layer_extensions.reserve(n_layers);
+
+    bool parent_is_c1 = true;
+    std::size_t c1_idx = 0, c2_idx = 0;
+    for (std::size_t i = 0; i < n_layers; ++i)
+    {
+        if (parent_is_c1)
+        {
+            const auto &c1_layer_ext = tree_extension.c1_layer_extensions.at(c1_idx);
+
+            std::vector<crypto::ec_point> hashes;
+            hashes.reserve(c1_layer_ext.hashes.size());
+            for (const auto &h : c1_layer_ext.hashes)
+                hashes.emplace_back(m_c1->to_bytes(h));
+
+            layer_extensions.emplace_back(fcmp_pp::CompressedLayerExtension{
+                    .start_idx                 = c1_layer_ext.start_idx,
+                    .update_existing_last_hash = c1_layer_ext.update_existing_last_hash,
+                    .hashes                    = std::move(hashes)
+                });
+
+            ++c1_idx;
+        }
+        else
+        {
+            const auto &c2_layer_ext = tree_extension.c2_layer_extensions.at(c2_idx);
+
+            std::vector<crypto::ec_point> hashes;
+            hashes.reserve(c2_layer_ext.hashes.size());
+            for (const auto &h : c2_layer_ext.hashes)
+                hashes.emplace_back(m_c2->to_bytes(h));
+
+            layer_extensions.emplace_back(fcmp_pp::CompressedLayerExtension{
+                    .start_idx                 = c2_layer_ext.start_idx,
+                    .update_existing_last_hash = c2_layer_ext.update_existing_last_hash,
+                    .hashes                    = std::move(hashes)
+                });
+
+            ++c2_idx;
+        }
+
+        parent_is_c1 = !parent_is_c1;
+    }
+
+    return CompressedTreeExtension{
+            .leaves = std::move(tree_extension.leaves),
+            .layer_extensions = std::move(layer_extensions)
+        };
+}
+
+// Explicit instantiation
+template CompressedTreeExtension CurveTrees<Selene, Helios>::compress_tree_extension(
+    typename CurveTrees<Selene, Helios>::TreeExtension &&tree_ext) const;
+//----------------------------------------------------------------------------------------------------------------------
+template<typename C1, typename C2>
 std::vector<uint64_t> CurveTrees<C1, C2>::n_elems_per_layer(const uint64_t n_leaf_tuples) const
 {
     std::vector<uint64_t> n_elems_per_layer;
@@ -990,7 +1056,7 @@ bool CurveTrees<Selene, Helios>::audit_path(const CurveTrees<Selene, Helios>::Pa
     const auto output_tuple = output_to_tuple(output);
     bool found = false;
     for (std::size_t i = 0; !found && i < leaves.size(); ++i)
-        found = (output_tuple.O == leaves[i].O && output_tuple.I == leaves[i].I && output_tuple.C == leaves[i].C);
+        found = output_tuple == leaves[i];
     CHECK_AND_ASSERT_MES(found, false, "did not find output in chunk of leaves");
 
     // Get all hashes
@@ -1049,7 +1115,7 @@ bool CurveTrees<Selene, Helios>::audit_path(const CurveTrees<Selene, Helios>::Pa
 }
 //----------------------------------------------------------------------------------------------------------------------
 template<>
-CurveTrees<Selene, Helios>::Path CurveTrees<Selene, Helios>::path_bytes_to_path(const PathBytes &path_bytes) const
+CurveTrees<Selene, Helios>::Path CurveTrees<Selene, Helios>::path_bytes_to_path(const CompressedPath &path_bytes) const
 {
     typename CurveTrees<Selene, Helios>::Path path;
 
@@ -1065,15 +1131,15 @@ CurveTrees<Selene, Helios>::Path CurveTrees<Selene, Helios>::path_bytes_to_path(
         if (parent_is_c1)
         {
             path.c1_layers.emplace_back();
-            path.c1_layers.back().reserve(layer.chunk_bytes.size());
-            for (const auto &elem : layer.chunk_bytes)
+            path.c1_layers.back().reserve(layer.elems.size());
+            for (const auto &elem : layer.elems)
                 path.c1_layers.back().emplace_back(m_c1->from_bytes(elem));
         }
         else
         {
             path.c2_layers.emplace_back();
-            path.c2_layers.back().reserve(layer.chunk_bytes.size());
-            for (const auto &elem : layer.chunk_bytes)
+            path.c2_layers.back().reserve(layer.elems.size());
+            for (const auto &elem : layer.elems)
                 path.c2_layers.back().emplace_back(m_c2->from_bytes(elem));
         }
 
@@ -1385,11 +1451,11 @@ CurveTreesV1::Path CurveTrees<Selene, Helios>::get_single_dummy_path(
 };
 //----------------------------------------------------------------------------------------------------------------------
 template<typename C1, typename C2>
-typename CurveTrees<C1, C2>::TreeExtension CurveTrees<C1, C2>::path_to_tree_extension(const PathBytes &path_bytes,
+typename CurveTrees<C1, C2>::TreeExtension CurveTrees<C1, C2>::path_to_tree_extension(const CompressedPath &path_bytes,
     const PathIndexes &path_idxs) const
 {
     typename CurveTrees<C1, C2>::TreeExtension tree_extension;
-    tree_extension.leaves = typename CurveTrees<C1, C2>::Leaves{
+    tree_extension.leaves = ContiguousLeaves{
             .start_leaf_tuple_idx = path_idxs.leaf_range.first,
             .tuples               = path_bytes.leaves
         };
@@ -1405,7 +1471,7 @@ typename CurveTrees<C1, C2>::TreeExtension CurveTrees<C1, C2>::path_to_tree_exte
 
         CHECK_AND_ASSERT_THROW_MES(end_idx > start_idx,
             "path_to_tree_extension: unexpected end_idx <= start_idx");
-        CHECK_AND_ASSERT_THROW_MES(chunk.chunk_bytes.size() == (end_idx - start_idx),
+        CHECK_AND_ASSERT_THROW_MES(chunk.elems.size() == (end_idx - start_idx),
             "path_to_tree_extension: size mismatch last chunk");
 
         if (parent_is_c1)
@@ -1413,7 +1479,7 @@ typename CurveTrees<C1, C2>::TreeExtension CurveTrees<C1, C2>::path_to_tree_exte
             LayerExtension<C1> layer_ext;
             layer_ext.start_idx = start_idx;
             layer_ext.update_existing_last_hash = false;
-            for (const auto &child : chunk.chunk_bytes)
+            for (const auto &child : chunk.elems)
                 layer_ext.hashes.emplace_back(m_c1->from_bytes(child));
             tree_extension.c1_layer_extensions.emplace_back(std::move(layer_ext));
         }
@@ -1422,7 +1488,7 @@ typename CurveTrees<C1, C2>::TreeExtension CurveTrees<C1, C2>::path_to_tree_exte
             LayerExtension<C2> layer_ext;
             layer_ext.start_idx = start_idx;
             layer_ext.update_existing_last_hash = false;
-            for (const auto &child : chunk.chunk_bytes)
+            for (const auto &child : chunk.elems)
                 layer_ext.hashes.emplace_back(m_c2->from_bytes(child));
             tree_extension.c2_layer_extensions.emplace_back(std::move(layer_ext));
         }
@@ -1436,7 +1502,7 @@ typename CurveTrees<C1, C2>::TreeExtension CurveTrees<C1, C2>::path_to_tree_exte
 
 // Explicit instantiation
 template CurveTrees<Selene, Helios>::TreeExtension CurveTrees<Selene, Helios>::path_to_tree_extension(
-    const PathBytes &path_bytes,
+    const CompressedPath &path_bytes,
     const PathIndexes &path_idxs) const;
 //----------------------------------------------------------------------------------------------------------------------
 //----------------------------------------------------------------------------------------------------------------------
@@ -1593,11 +1659,11 @@ void CurveTrees<C1, C2>::set_valid_leaves(
                     std::size_t point_idx = i * 2;
                     for (std::size_t j = i; j < end; ++j)
                     {
-                        rct::key wei_x;
-                        rct::key wei_y;
+                        crypto::ec_coord wei_x;
+                        crypto::ec_coord wei_y;
                         fe_ed_derivatives_to_wei_x_y(
-                                wei_x.bytes,
-                                wei_y.bytes,
+                                to_bytes(wei_x),
+                                to_bytes(wei_y),
                                 batch_inv_res[point_idx]/*inv_one_minus_y*/,
                                 one_plus_y_vec[j],
                                 batch_inv_res[point_idx+1]/*inv_one_minus_y_mul_x*/
@@ -1733,20 +1799,12 @@ CurveTrees<Selene, Helios>::PathForProof CurveTrees<Selene, Helios>::path_for_pr
         bool found = false;
         for (const auto &leaf : path.leaves)
         {
-            found = output_tuple.O == leaf.O && output_tuple.I == leaf.I && output_tuple.C == leaf.C;
+            found = output_tuple == leaf;
             if (found)
                 break;
             ++output_idx_in_path;
         }
         CHECK_AND_ASSERT_THROW_MES(found, "failed to find output in path");
-    }
-
-    // Set up OutputBytes compatible with Rust FFI
-    std::vector<fcmp_pp::OutputBytes> output_bytes;
-    {
-        output_bytes.reserve(path.leaves.size());
-        for (const auto &leaf : path.leaves)
-            output_bytes.push_back(leaf.to_output_bytes());
     }
 
     const size_t n_tree_layers = path.c1_layers.size() + path.c2_layers.size();
@@ -1785,7 +1843,7 @@ CurveTrees<Selene, Helios>::PathForProof CurveTrees<Selene, Helios>::path_for_pr
     }
 
     return PathForProof {
-            .leaves           = std::move(output_bytes),
+            .leaves           = path.leaves,
             .output_idx       = output_idx_in_path,
             .c2_scalar_chunks = std::move(c2_scalar_chunks),
             .c1_scalar_chunks = std::move(c1_scalar_chunks),
