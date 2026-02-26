@@ -41,6 +41,7 @@
 
 #include <deque>
 #include <memory>
+#include <unordered_map>
 
 
 namespace fcmp_pp
@@ -49,6 +50,83 @@ namespace curve_trees
 {
 //----------------------------------------------------------------------------------------------------------------------
 static const int TREE_CACHE_VERSION = 0;
+
+using BlockIdx  = uint64_t;
+using BlockHash = crypto::hash;
+
+using LeafIdx       = uint64_t;
+using LayerIdx      = std::size_t;
+using ChildChunkIdx = uint64_t;
+
+using LastLockedBlockIdx = BlockIdx;
+using CreatedBlockIdx = BlockIdx;
+using NumOutputs      = std::size_t;
+
+using OutputRefHash = crypto::hash;
+
+struct BlockMeta final
+{
+    BlockIdx blk_idx;
+    BlockHash blk_hash;
+    uint64_t n_leaf_tuples;
+
+    BEGIN_SERIALIZE_OBJECT()
+        FIELD(blk_idx)
+        FIELD(blk_hash)
+        FIELD(n_leaf_tuples)
+    END_SERIALIZE()
+};
+
+// We need to use a ref count on all individual elems in the cache because it's possible for:
+//  a) multiple blocks to share path elems that need to remain after pruning a block past the max reorg depth.
+//  b) multiple registered outputs to share the same path elems.
+// We can't remove a cached elem unless we know it's ref'd 0 times.
+struct CachedLeafChunk final
+{
+    std::vector<OutputPair> leaves;
+    uint64_t ref_count;
+
+    BEGIN_SERIALIZE_OBJECT()
+        FIELD(leaves)
+        FIELD(ref_count)
+    END_SERIALIZE()
+};
+
+struct CachedTreeElemChunk final
+{
+    std::vector<crypto::ec_point> tree_elems;
+    uint64_t ref_count;
+
+    BEGIN_SERIALIZE_OBJECT()
+        FIELD(tree_elems)
+        FIELD(ref_count)
+    END_SERIALIZE()
+};
+
+struct AssignedLeafIdx final
+{
+    bool assigned_leaf_idx{false};
+    LeafIdx leaf_idx{0};
+
+    void assign_leaf(const LeafIdx idx) { leaf_idx = idx; assigned_leaf_idx = true; }
+    void unassign_leaf() { leaf_idx = 0; assigned_leaf_idx = false; }
+
+    BEGIN_SERIALIZE_OBJECT()
+        FIELD(assigned_leaf_idx)
+        FIELD(leaf_idx)
+    END_SERIALIZE()
+};
+
+using LockedOutsByLastLockedBlock = std::unordered_map<LastLockedBlockIdx, std::vector<UnifiedOutput>>;
+using LockedOutputRefHashes       = std::unordered_map<LastLockedBlockIdx, NumOutputs>;
+using LockedOutputsByCreated      = std::unordered_map<CreatedBlockIdx, LockedOutputRefHashes>;
+
+using RegisteredOutputs = std::unordered_map<OutputRefHash, AssignedLeafIdx>;
+using LeafCache         = std::unordered_map<ChildChunkIdx, CachedLeafChunk>;
+using ChildChunkCache   = std::unordered_map<ChildChunkIdx, CachedTreeElemChunk>;
+
+// TODO: technically this can be a vector. There should *always* be at least 1 entry for every layer
+using TreeElemCache     = std::unordered_map<LayerIdx, ChildChunkCache>;
 //----------------------------------------------------------------------------------------------------------------------
 //----------------------------------------------------------------------------------------------------------------------
 // Syncs the tree and keeps a user's known received outputs up to date, all saved in memory.
@@ -99,7 +177,7 @@ public:
     void init(const uint64_t start_block_idx,
         const crypto::hash &start_block_hash,
         const uint64_t n_leaf_tuples,
-        const fcmp_pp::PathBytes &last_path,
+        const fcmp_pp::CompressedPath &last_path,
         const OutsByLastLockedBlock &timelocked_outputs);
 
     // TODO: make this part of the TreeSync interface
@@ -154,7 +232,7 @@ public:
     // Force add a path to the cache without re-constructing it via sync
     void force_add_output_path(const OutputPair &output,
         const LeafIdx leaf_idx,
-        const PathBytes &path_bytes,
+        const CompressedPath &path_bytes,
         const uint64_t n_leaf_tuples);
 
 // Internal helper functions

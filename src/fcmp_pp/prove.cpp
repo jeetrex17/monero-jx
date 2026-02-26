@@ -232,7 +232,6 @@ FcmpMembershipProof prove_membership(const std::vector<FcmpPpProveMembershipInpu
     const std::size_t proof_len = membership_proof_len(fcmp_pp_prove_inputs.size(), n_tree_layers);
     p.resize(proof_len);
 
-    size_t proof_size = p.size();
     const int r = ::fcmp_pp_prove_membership(fcmp_pp_prove_inputs_slice,
         n_tree_layers,
         proof_len,

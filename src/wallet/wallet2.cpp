@@ -1826,7 +1826,7 @@ static void assert_top_block_match(const hashchain &blockchain, const tools::wal
   crypto::hash m_blockchain_top_hash;
   const uint64_t m_blockchain_top_block_idx = get_top_synced_block(blockchain, m_blockchain_top_hash);
 
-  fcmp_pp::BlockMeta top_synced_block;
+  fcmp_pp::curve_trees::BlockMeta top_synced_block;
   THROW_WALLET_EXCEPTION_IF(!tree_cache.get_top_block(top_synced_block), tools::error::wallet_internal_error,
     "empty tree sync cache");
 
@@ -3502,7 +3502,7 @@ uint64_t wallet2::check_and_handle_reorg(const uint64_t start_height, const cryp
   assert_top_block_match(m_blockchain, m_tree_cache);
 
   // Get the deepest block we can reorg back to and set max reorg depth
-  fcmp_pp::BlockMeta front_synced_block;
+  fcmp_pp::curve_trees::BlockMeta front_synced_block;
   THROW_WALLET_EXCEPTION_IF(!m_tree_cache.get_front_block(front_synced_block), error::wallet_internal_error,
     "check_and_handle_reorg: failed to get front block from tree cache");
   THROW_WALLET_EXCEPTION_IF(front_synced_block.blk_idx > m_tree_cache.n_synced_blocks(), error::wallet_internal_error,

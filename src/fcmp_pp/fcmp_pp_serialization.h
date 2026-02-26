@@ -29,7 +29,6 @@
 #pragma once
 
 #include "fcmp_pp_types.h"
-#include "serialization/keyvalue_serialization.h"
 #include "serialization/serialization.h"
 #include "serialization/binary_archive.h"
 #include "serialization/debug_archive.h"
@@ -59,25 +58,4 @@ VARIANT_TAG(debug_archive, fcmp_pp::CarrotOutputPairV1, "carrot_out_pair_v1");
 BEGIN_SERIALIZE_OBJECT_FN(fcmp_pp::UnifiedOutput)
     FIELD_F(unified_id)
     FIELD_F(output_pair)
-END_SERIALIZE()
-
-BEGIN_SERIALIZE_OBJECT_FN(fcmp_pp::BlockMeta)
-    FIELD_F(blk_idx)
-    FIELD_F(blk_hash)
-    FIELD_F(n_leaf_tuples)
-END_SERIALIZE()
-
-BEGIN_SERIALIZE_OBJECT_FN(fcmp_pp::CachedLeafChunk)
-    FIELD_F(leaves)
-    FIELD_F(ref_count)
-END_SERIALIZE()
-
-BEGIN_SERIALIZE_OBJECT_FN(fcmp_pp::CachedTreeElemChunk)
-    FIELD_F(tree_elems)
-    FIELD_F(ref_count)
-END_SERIALIZE()
-
-BEGIN_SERIALIZE_OBJECT_FN(fcmp_pp::AssignedLeafIdx)
-    FIELD_F(assigned_leaf_idx)
-    FIELD_F(leaf_idx)
 END_SERIALIZE()

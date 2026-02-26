@@ -62,7 +62,7 @@ namespace crypto {
 
   // x or y coordinate
   POD_CLASS ec_coord {
-    char data [32];
+    char data[32];
   };
 
   POD_CLASS public_key: ec_point {

@@ -36,6 +36,17 @@
 #include <algorithm>
 #include <stdlib.h>
 
+namespace
+{
+    // Struct composed of ec elems needed to get a full-fledged leaf tuple
+    struct PreLeafTuple final
+    {
+        fcmp_pp::EdDerivatives O_derivatives;
+        fcmp_pp::EdDerivatives I_derivatives;
+        fcmp_pp::EdDerivatives C_derivatives;
+    };
+}
+
 namespace fcmp_pp
 {
 namespace curve_trees
@@ -822,6 +833,66 @@ template CurveTrees<Selene, Helios>::TreeExtension CurveTrees<Selene, Helios>::g
     const bool use_fast_torsion_check);
 //----------------------------------------------------------------------------------------------------------------------
 template<typename C1, typename C2>
+CompressedTreeExtension CurveTrees<C1, C2>::compress_tree_extension(
+    typename CurveTrees<C1, C2>::TreeExtension &&tree_extension) const
+{
+    std::vector<CompressedLayerExtension> layer_extensions;
+    const std::size_t n_layers = tree_extension.c1_layer_extensions.size() + tree_extension.c2_layer_extensions.size();
+    layer_extensions.reserve(n_layers);
+
+    bool parent_is_c1 = true;
+    std::size_t c1_idx = 0, c2_idx = 0;
+    for (std::size_t i = 0; i < n_layers; ++i)
+    {
+        if (parent_is_c1)
+        {
+            const auto &c1_layer_ext = tree_extension.c1_layer_extensions.at(c1_idx);
+
+            std::vector<crypto::ec_point> hashes;
+            hashes.reserve(c1_layer_ext.hashes.size());
+            for (const auto &h : c1_layer_ext.hashes)
+                hashes.emplace_back(m_c1->to_bytes(h));
+
+            layer_extensions.emplace_back(fcmp_pp::CompressedLayerExtension{
+                    .start_idx                 = c1_layer_ext.start_idx,
+                    .update_existing_last_hash = c1_layer_ext.update_existing_last_hash,
+                    .hashes                    = std::move(hashes)
+                });
+
+            ++c1_idx;
+        }
+        else
+        {
+            const auto &c2_layer_ext = tree_extension.c2_layer_extensions.at(c2_idx);
+
+            std::vector<crypto::ec_point> hashes;
+            hashes.reserve(c2_layer_ext.hashes.size());
+            for (const auto &h : c2_layer_ext.hashes)
+                hashes.emplace_back(m_c2->to_bytes(h));
+
+            layer_extensions.emplace_back(fcmp_pp::CompressedLayerExtension{
+                    .start_idx                 = c2_layer_ext.start_idx,
+                    .update_existing_last_hash = c2_layer_ext.update_existing_last_hash,
+                    .hashes                    = std::move(hashes)
+                });
+
+            ++c2_idx;
+        }
+
+        parent_is_c1 = !parent_is_c1;
+    }
+
+    return CompressedTreeExtension{
+            .leaves = std::move(tree_extension.leaves),
+            .layer_extensions = std::move(layer_extensions)
+        };
+}
+
+// Explicit instantiation
+template CompressedTreeExtension CurveTrees<Selene, Helios>::compress_tree_extension(
+    typename CurveTrees<Selene, Helios>::TreeExtension &&tree_ext) const;
+//----------------------------------------------------------------------------------------------------------------------
+template<typename C1, typename C2>
 std::vector<uint64_t> CurveTrees<C1, C2>::n_elems_per_layer(const uint64_t n_leaf_tuples) const
 {
     std::vector<uint64_t> n_elems_per_layer;
@@ -1044,7 +1115,7 @@ bool CurveTrees<Selene, Helios>::audit_path(const CurveTrees<Selene, Helios>::Pa
 }
 //----------------------------------------------------------------------------------------------------------------------
 template<>
-CurveTrees<Selene, Helios>::Path CurveTrees<Selene, Helios>::path_bytes_to_path(const PathBytes &path_bytes) const
+CurveTrees<Selene, Helios>::Path CurveTrees<Selene, Helios>::path_bytes_to_path(const CompressedPath &path_bytes) const
 {
     typename CurveTrees<Selene, Helios>::Path path;
 
@@ -1060,15 +1131,15 @@ CurveTrees<Selene, Helios>::Path CurveTrees<Selene, Helios>::path_bytes_to_path(
         if (parent_is_c1)
         {
             path.c1_layers.emplace_back();
-            path.c1_layers.back().reserve(layer.chunk_bytes.size());
-            for (const auto &elem : layer.chunk_bytes)
+            path.c1_layers.back().reserve(layer.elems.size());
+            for (const auto &elem : layer.elems)
                 path.c1_layers.back().emplace_back(m_c1->from_bytes(elem));
         }
         else
         {
             path.c2_layers.emplace_back();
-            path.c2_layers.back().reserve(layer.chunk_bytes.size());
-            for (const auto &elem : layer.chunk_bytes)
+            path.c2_layers.back().reserve(layer.elems.size());
+            for (const auto &elem : layer.elems)
                 path.c2_layers.back().emplace_back(m_c2->from_bytes(elem));
         }
 
@@ -1380,11 +1451,11 @@ CurveTreesV1::Path CurveTrees<Selene, Helios>::get_single_dummy_path(
 };
 //----------------------------------------------------------------------------------------------------------------------
 template<typename C1, typename C2>
-typename CurveTrees<C1, C2>::TreeExtension CurveTrees<C1, C2>::path_to_tree_extension(const PathBytes &path_bytes,
+typename CurveTrees<C1, C2>::TreeExtension CurveTrees<C1, C2>::path_to_tree_extension(const CompressedPath &path_bytes,
     const PathIndexes &path_idxs) const
 {
     typename CurveTrees<C1, C2>::TreeExtension tree_extension;
-    tree_extension.leaves = Leaves{
+    tree_extension.leaves = ContiguousLeaves{
             .start_leaf_tuple_idx = path_idxs.leaf_range.first,
             .tuples               = path_bytes.leaves
         };
@@ -1400,7 +1471,7 @@ typename CurveTrees<C1, C2>::TreeExtension CurveTrees<C1, C2>::path_to_tree_exte
 
         CHECK_AND_ASSERT_THROW_MES(end_idx > start_idx,
             "path_to_tree_extension: unexpected end_idx <= start_idx");
-        CHECK_AND_ASSERT_THROW_MES(chunk.chunk_bytes.size() == (end_idx - start_idx),
+        CHECK_AND_ASSERT_THROW_MES(chunk.elems.size() == (end_idx - start_idx),
             "path_to_tree_extension: size mismatch last chunk");
 
         if (parent_is_c1)
@@ -1408,7 +1479,7 @@ typename CurveTrees<C1, C2>::TreeExtension CurveTrees<C1, C2>::path_to_tree_exte
             LayerExtension<C1> layer_ext;
             layer_ext.start_idx = start_idx;
             layer_ext.update_existing_last_hash = false;
-            for (const auto &child : chunk.chunk_bytes)
+            for (const auto &child : chunk.elems)
                 layer_ext.hashes.emplace_back(m_c1->from_bytes(child));
             tree_extension.c1_layer_extensions.emplace_back(std::move(layer_ext));
         }
@@ -1417,7 +1488,7 @@ typename CurveTrees<C1, C2>::TreeExtension CurveTrees<C1, C2>::path_to_tree_exte
             LayerExtension<C2> layer_ext;
             layer_ext.start_idx = start_idx;
             layer_ext.update_existing_last_hash = false;
-            for (const auto &child : chunk.chunk_bytes)
+            for (const auto &child : chunk.elems)
                 layer_ext.hashes.emplace_back(m_c2->from_bytes(child));
             tree_extension.c2_layer_extensions.emplace_back(std::move(layer_ext));
         }
@@ -1431,7 +1502,7 @@ typename CurveTrees<C1, C2>::TreeExtension CurveTrees<C1, C2>::path_to_tree_exte
 
 // Explicit instantiation
 template CurveTrees<Selene, Helios>::TreeExtension CurveTrees<Selene, Helios>::path_to_tree_extension(
-    const PathBytes &path_bytes,
+    const CompressedPath &path_bytes,
     const PathIndexes &path_idxs) const;
 //----------------------------------------------------------------------------------------------------------------------
 //----------------------------------------------------------------------------------------------------------------------
