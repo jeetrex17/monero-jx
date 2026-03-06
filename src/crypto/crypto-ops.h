@@ -191,7 +191,16 @@ void fe_tobytes(unsigned char *, const fe);
 void fe_copy(fe h, const fe f);
 int fe_isnegative(const fe f);
 void fe_invert(fe out, const fe z);
-int fe_batch_invert(fe *out, const fe *in, const int n);
+int fe_equals(const fe a, const fe b);
+
+/**
+@brief: out[i] = 1/in[i] for i in [0, n). Uses Montgomery's trick
+@return: 0 on success, some other value otherwise
+
+Unlike other crypto functions, `out` and `in` memory sections CANNOT be aliased.
+If `out` and `in` overlap, it will cause undefined output.
+**/
+void fe_batch_invert(fe *out, const fe *in, const int n);
 void fe_mul(fe out, const fe, const fe);
 void fe_sq(fe h, const fe f);
 void fe_sub(fe h, const fe f, const fe g);

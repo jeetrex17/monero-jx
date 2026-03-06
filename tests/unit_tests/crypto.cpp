@@ -352,18 +352,10 @@ TEST(Crypto, batch_inversion)
 {
   const std::size_t MAX_TEST_ELEMS = 1000;
 
-  // Memory allocator
-  auto alloc = [](const std::size_t n) -> fe*
-  {
-    fe *ptr = (fe *) malloc(n * sizeof(fe));
-    if (!ptr)
-      throw std::runtime_error("failed to malloc fe *");
-    return ptr;
-  };
+  std::unique_ptr<fe[]> init_elems = std::make_unique<fe[]>(MAX_TEST_ELEMS);
+  std::unique_ptr<fe[]> norm_inverted = std::make_unique<fe[]>(MAX_TEST_ELEMS);
 
   // Init test elems and individual inversions
-  fe *init_elems    = alloc(MAX_TEST_ELEMS);
-  fe *norm_inverted = alloc(MAX_TEST_ELEMS);
   for (std::size_t i = 0; i < MAX_TEST_ELEMS; ++i)
   {
     const cryptonote::keypair kp = cryptonote::keypair::generate(hw::get_device("default"));
@@ -374,14 +366,11 @@ TEST(Crypto, batch_inversion)
   // Do batch inversions and compare to individual inversions
   for (std::size_t n_elems = 1; n_elems <= MAX_TEST_ELEMS; ++n_elems)
   {
-    fe *batch_inverted = alloc(n_elems);
-    ASSERT_EQ(fe_batch_invert(batch_inverted, init_elems, n_elems), 0);
-    ASSERT_EQ(memcmp(batch_inverted, norm_inverted, n_elems * sizeof(fe)), 0);
-    free(batch_inverted);
+    std::unique_ptr<fe[]> batch_inverted = std::make_unique<fe[]>(n_elems);
+    fe_batch_invert(batch_inverted.get(), init_elems.get(), n_elems);
+    for (std::size_t i = 0; i < n_elems; ++i)
+      ASSERT_EQ(fe_equals(batch_inverted[i], norm_inverted[i]), 1);
   }
-
-  free(init_elems);
-  free(norm_inverted);
 }
 
 TEST(Crypto, fe_constants)
