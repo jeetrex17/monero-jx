@@ -7359,6 +7359,15 @@ std::map<uint32_t, std::pair<uint64_t, std::pair<uint64_t, uint64_t>>> wallet2::
   std::map<uint32_t, std::pair<uint64_t, std::pair<uint64_t, uint64_t>>> amount_per_subaddr;
   const uint64_t blockchain_height = get_blockchain_current_height();
   const uint64_t now = time(NULL);
+  bool use_fcmp_pp_unlock_rules = false;
+  try
+  {
+    use_fcmp_pp_unlock_rules = use_fork_rules(HF_VERSION_FCMP_PLUS_PLUS, 0);
+  }
+  catch (...)
+  {
+    use_fcmp_pp_unlock_rules = use_fork_rules_offline(HF_VERSION_FCMP_PLUS_PLUS, 0);
+  }
   for(const transfer_details& td: m_transfers)
   {
     if (td.amount() > m_ignore_outputs_above || td.amount() < m_ignore_outputs_below)
@@ -7377,10 +7386,18 @@ std::map<uint32_t, std::pair<uint64_t, std::pair<uint64_t, uint64_t>>> wallet2::
         uint64_t unlock_height = td.m_block_height + std::max<uint64_t>(CRYPTONOTE_DEFAULT_TX_SPENDABLE_AGE, CRYPTONOTE_LOCKED_TX_ALLOWED_DELTA_BLOCKS);
         if (td.m_tx.unlock_time < CRYPTONOTE_MAX_BLOCK_NUMBER && td.m_tx.unlock_time > unlock_height)
           unlock_height = td.m_tx.unlock_time;
-        // FIXME: update for FCMP++
-        uint64_t unlock_time = td.m_tx.unlock_time >= CRYPTONOTE_MAX_BLOCK_NUMBER ? td.m_tx.unlock_time : 0;
-        blocks_to_unlock = unlock_height > blockchain_height ? unlock_height - blockchain_height : 0;
-        time_to_unlock = unlock_time > now ? unlock_time - now : 0;
+        if (use_fcmp_pp_unlock_rules && td.m_tx.unlock_time >= CRYPTONOTE_MAX_BLOCK_NUMBER)
+        {
+          unlock_height = cryptonote::get_last_locked_block_index(td.m_tx.unlock_time, td.m_block_height) + 1;
+          blocks_to_unlock = unlock_height > blockchain_height ? unlock_height - blockchain_height : 0;
+          time_to_unlock = blocks_to_unlock * DIFFICULTY_TARGET_V2;
+        }
+        else
+        {
+          uint64_t unlock_time = td.m_tx.unlock_time >= CRYPTONOTE_MAX_BLOCK_NUMBER ? td.m_tx.unlock_time : 0;
+          blocks_to_unlock = unlock_height > blockchain_height ? unlock_height - blockchain_height : 0;
+          time_to_unlock = unlock_time > now ? unlock_time - now : 0;
+        }
         amount = 0;
       }
       auto found = amount_per_subaddr.find(td.m_subaddr_index.minor);
