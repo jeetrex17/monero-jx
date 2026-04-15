@@ -45,6 +45,12 @@ static constexpr const int E_UNSUPPORTED_ADDRESS_TYPE = 1;
 struct address_device
 {
     /**
+     * brief: whether this device can derive addresses for the given scheme
+     * param: derive_type -
+     */
+    virtual bool supports_derive_type(const AddressDeriveType derive_type) const = 0;
+
+    /**
      * brief: get K^j_s given j
      * param: subaddr_index - j
      * outparam: address_spend_pubkey_out - K^j_s

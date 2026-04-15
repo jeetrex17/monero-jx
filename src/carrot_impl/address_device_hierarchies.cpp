@@ -84,6 +84,11 @@ cryptonote_hierarchy_address_device::cryptonote_hierarchy_address_device(
     assert(this->m_k_view_incoming_dev);
 }
 //-------------------------------------------------------------------------------------------------------------------
+bool cryptonote_hierarchy_address_device::supports_derive_type(const AddressDeriveType derive_type) const
+{
+    return derive_type == AddressDeriveType::Auto || derive_type == AddressDeriveType::PreCarrot;
+}
+//-------------------------------------------------------------------------------------------------------------------
 void cryptonote_hierarchy_address_device::get_address_spend_pubkey(const subaddress_index_extended &subaddr_index,
     crypto::public_key &address_spend_pubkey_out) const
 {
@@ -207,6 +212,11 @@ carrot_hierarchy_address_device::carrot_hierarchy_address_device(
     assert(this->m_s_generate_address_dev);
 }
 //-------------------------------------------------------------------------------------------------------------------
+bool carrot_hierarchy_address_device::supports_derive_type(const AddressDeriveType derive_type) const
+{
+    return derive_type == AddressDeriveType::Auto || derive_type == AddressDeriveType::Carrot;
+}
+//-------------------------------------------------------------------------------------------------------------------
 void carrot_hierarchy_address_device::get_address_spend_pubkey(const subaddress_index_extended &subaddr_index,
     crypto::public_key &address_spend_pubkey_out) const
 {
@@ -320,6 +330,21 @@ hybrid_hierarchy_address_device::hybrid_hierarchy_address_device(std::shared_ptr
     m_carrot_addr_dev(std::move(carrot_addr_dev)),
     m_cryptonote_addr_dev(std::move(cryptonote_addr_dev))
 {}
+//-------------------------------------------------------------------------------------------------------------------
+bool hybrid_hierarchy_address_device::supports_derive_type(const AddressDeriveType derive_type) const
+{
+    switch (derive_type)
+    {
+    case AddressDeriveType::Auto:
+        return static_cast<bool>(this->m_carrot_addr_dev) || static_cast<bool>(this->m_cryptonote_addr_dev);
+    case AddressDeriveType::PreCarrot:
+        return static_cast<bool>(this->m_cryptonote_addr_dev);
+    case AddressDeriveType::Carrot:
+        return static_cast<bool>(this->m_carrot_addr_dev);
+    default:
+        return false;
+    }
+}
 //-------------------------------------------------------------------------------------------------------------------
 void hybrid_hierarchy_address_device::get_address_spend_pubkey(const subaddress_index_extended &subaddr_index,
     crypto::public_key &address_spend_pubkey_out) const

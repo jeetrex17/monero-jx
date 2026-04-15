@@ -67,6 +67,8 @@ public:
         const crypto::public_key &cryptonote_account_spend_pubkey);
 
 //address_device
+    bool supports_derive_type(const AddressDeriveType derive_type) const override;
+
     void get_address_spend_pubkey(const subaddress_index_extended &subaddr_index,
         crypto::public_key &address_spend_pubkey_out) const override;
 
@@ -118,6 +120,8 @@ public:
         const crypto::public_key &carrot_account_view_pubkey);
 
 //address_device
+    bool supports_derive_type(const AddressDeriveType derive_type) const override;
+
     void get_address_spend_pubkey(const subaddress_index_extended &subaddr_index,
         crypto::public_key &address_spend_pubkey_out) const override;
 
@@ -153,6 +157,8 @@ public:
         std::shared_ptr<address_device> cryptonote_addr_dev);
 
 //address_device
+    bool supports_derive_type(const AddressDeriveType derive_type) const override;
+
     void get_address_spend_pubkey(const subaddress_index_extended &subaddr_index,
         crypto::public_key &address_spend_pubkey_out) const override;
 
