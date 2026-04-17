@@ -7381,7 +7381,7 @@ void BlockchainLMDB::migrate_5_6()
 
         ++i;
         if (i == n_blocks)
-          LOGIF(el::Level::Info)
+          if (progress_width)
             std::cout << '\r' << std::string(progress_width, ' ') << '\r' << std::flush;
       }
       batch_stop();
