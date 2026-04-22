@@ -197,12 +197,12 @@ namespace
   const char* USAGE_INCOMING_TRANSFERS("incoming_transfers [available|unavailable] [verbose] [uses] [index=<N1>[,<N2>[,...]]]");
   const char* USAGE_PAYMENTS("payments <PID_1> [<PID_2> ... <PID_N>]");
   const char* USAGE_PAYMENT_ID("payment_id");
-  const char* USAGE_TRANSFER("transfer [index=<N1>[,<N2>,...]] [<priority>] [<ring_size>] (<URI> | <address> <amount>) [subtractfeefrom=<D0>[,<D1>,all,...]] [<payment_id>]");
-  const char* USAGE_SWEEP_ALL("sweep_all [index=<N1>[,<N2>,...] | index=all] [<priority>] [<ring_size>] [outputs=<N>] <address> [<payment_id (obsolete)>]");
-  const char* USAGE_SWEEP_ACCOUNT("sweep_account <account> [index=<N1>[,<N2>,...] | index=all] [<priority>] [<ring_size>] [outputs=<N>] <address> [<payment_id (obsolete)>]");
-  const char* USAGE_SWEEP_BELOW("sweep_below <amount_threshold> [index=<N1>[,<N2>,...]] [<priority>] [<ring_size>] <address> [<payment_id (obsolete)>]");
-  const char* USAGE_SWEEP_SINGLE("sweep_single [<priority>] [<ring_size>] [outputs=<N>] <key_image> <address> [<payment_id (obsolete)>]");
-  const char* USAGE_DONATE("donate [index=<N1>[,<N2>,...]] [<priority>] [<ring_size>] <amount> [<payment_id (obsolete)>]");
+  const char* USAGE_TRANSFER("transfer [index=<N1>[,<N2>,...]] [<priority>] (<URI> | <address> <amount>) [subtractfeefrom=<D0>[,<D1>,all,...]] [<payment_id>]");
+  const char* USAGE_SWEEP_ALL("sweep_all [index=<N1>[,<N2>,...] | index=all] [<priority>] [outputs=<N>] <address> [<payment_id (obsolete)>]");
+  const char* USAGE_SWEEP_ACCOUNT("sweep_account <account> [index=<N1>[,<N2>,...] | index=all] [<priority>] [outputs=<N>] <address> [<payment_id (obsolete)>]");
+  const char* USAGE_SWEEP_BELOW("sweep_below <amount_threshold> [index=<N1>[,<N2>,...]] [<priority>] <address> [<payment_id (obsolete)>]");
+  const char* USAGE_SWEEP_SINGLE("sweep_single [<priority>] [outputs=<N>] <key_image> <address> [<payment_id (obsolete)>]");
+  const char* USAGE_DONATE("donate [index=<N1>[,<N2>,...]] [<priority>] <amount> [<payment_id (obsolete)>]");
   const char* USAGE_SIGN_TRANSFER("sign_transfer [export_raw] [<filename>]");
   const char* USAGE_SET_LOG("set_log <level>|{+,-,}<categories>");
   const char* USAGE_ACCOUNT("account\n"
@@ -706,57 +706,6 @@ namespace
     return description;
   }
 
-  std::string get_transfer_usage(bool legacy_ring_ux)
-  {
-    if (legacy_ring_ux)
-      return tr("transfer [index=<N1>[,<N2>,...]] [<priority>] [<ring_size>] (<URI> | <address> <amount>) [subtractfeefrom=<D0>[,<D1>,all,...]] [<payment_id>]");
-    return tr("transfer [index=<N1>[,<N2>,...]] [<priority>] (<URI> | <address> <amount>) [subtractfeefrom=<D0>[,<D1>,all,...]] [<payment_id>]");
-  }
-
-  std::string get_sweep_all_usage(bool legacy_ring_ux)
-  {
-    if (legacy_ring_ux)
-      return tr("sweep_all [index=<N1>[,<N2>,...] | index=all] [<priority>] [<ring_size>] [outputs=<N>] <address> [<payment_id (obsolete)>]");
-    return tr("sweep_all [index=<N1>[,<N2>,...] | index=all] [<priority>] [outputs=<N>] <address> [<payment_id (obsolete)>]");
-  }
-
-  std::string get_sweep_account_usage(bool legacy_ring_ux)
-  {
-    if (legacy_ring_ux)
-      return tr("sweep_account <account> [index=<N1>[,<N2>,...] | index=all] [<priority>] [<ring_size>] [outputs=<N>] <address> [<payment_id (obsolete)>]");
-    return tr("sweep_account <account> [index=<N1>[,<N2>,...] | index=all] [<priority>] [outputs=<N>] <address> [<payment_id (obsolete)>]");
-  }
-
-  std::string get_sweep_below_usage(bool legacy_ring_ux)
-  {
-    if (legacy_ring_ux)
-      return tr("sweep_below <amount_threshold> [index=<N1>[,<N2>,...]] [<priority>] [<ring_size>] <address> [<payment_id (obsolete)>]");
-    return tr("sweep_below <amount_threshold> [index=<N1>[,<N2>,...]] [<priority>] <address> [<payment_id (obsolete)>]");
-  }
-
-  std::string get_sweep_single_usage(bool legacy_ring_ux)
-  {
-    if (legacy_ring_ux)
-      return tr("sweep_single [<priority>] [<ring_size>] [outputs=<N>] <key_image> <address> [<payment_id (obsolete)>]");
-    return tr("sweep_single [<priority>] [outputs=<N>] <key_image> <address> [<payment_id (obsolete)>]");
-  }
-
-  std::string get_donate_usage(bool legacy_ring_ux)
-  {
-    if (legacy_ring_ux)
-      return tr("donate [index=<N1>[,<N2>,...]] [<priority>] [<ring_size>] <amount> [<payment_id (obsolete)>]");
-    return tr("donate [index=<N1>[,<N2>,...]] [<priority>] <amount> [<payment_id (obsolete)>]");
-  }
-
-  std::string get_transfer_description(bool legacy_ring_ux)
-  {
-    std::string desc = tr("Transfer <amount> <address>. If the parameter \"index=<N1>[,<N2>,...]\" is specified, the wallet uses outputs received by addresses of those indices. If omitted, the wallet randomly chooses address indices to be used. In any case, it tries its best not to combine outputs across multiple addresses. <priority> is the priority of the transaction. The higher the priority, the higher the transaction fee. Valid values in priority order (from lowest to highest) are: unimportant, normal, elevated, priority, max. If omitted, the default value (see the command \"set priority\") is used. ");
-    if (legacy_ring_ux)
-      desc += tr("<ring_size> is the number of inputs to include for untraceability. ");
-    desc += tr("Multiple payments can be made at once by adding URI_2 or <address_2> <amount_2> etcetera (before the payment ID, if it's included). The \"subtractfeefrom=\" list allows you to choose which destinations to fund the tx fee from instead of the change output. The fee will be split across the chosen destinations proportionally equally. For example, to make 3 transfers where the fee is taken from the first and third destinations, one could do: \"transfer <addr1> 3 <addr2> 0.5 <addr3> 1 subtractfeefrom=0,2\". Let's say the tx fee is 0.1. The balance would drop by exactly 4.5 XMR including fees, and addr1 & addr3 would receive 2.925 & 0.975 XMR, respectively. Use \"subtractfeefrom=all\" to spread the fee across all destinations.");
-    return desc;
-  }
-
   bool get_fake_outs_count(const std::unique_ptr<tools::wallet2> &w2, std::vector<std::string> &local_args, size_t &fake_outs_count)
   {
     const size_t min_ring_size = w2->get_min_ring_size();
@@ -994,26 +943,12 @@ std::pair<std::string, std::string> simple_wallet::get_command_documentation(con
   if (documentation.first.empty())
     return documentation;
 
-  if (args.size() == 1 && !uses_legacy_ring_signature_ux(m_wallet.get()))
+  if (args.size() != 1 || args.front() != "set")
+    return documentation;
+
+  if (!uses_legacy_ring_signature_ux(m_wallet.get()))
   {
-    const std::string &cmd = args.front();
-    if (cmd == "set")
-      documentation.second = get_set_variable_description(false);
-    else if (cmd == "transfer")
-    {
-      documentation.first = get_transfer_usage(false);
-      documentation.second = get_transfer_description(false);
-    }
-    else if (cmd == "sweep_all")
-      documentation.first = get_sweep_all_usage(false);
-    else if (cmd == "sweep_account")
-      documentation.first = get_sweep_account_usage(false);
-    else if (cmd == "sweep_below")
-      documentation.first = get_sweep_below_usage(false);
-    else if (cmd == "sweep_single")
-      documentation.first = get_sweep_single_usage(false);
-    else if (cmd == "donate")
-      documentation.first = get_donate_usage(false);
+    documentation.second = get_set_variable_description(false);
   }
 
   return documentation;
@@ -1985,9 +1920,33 @@ bool simple_wallet::print_ring(const std::vector<std::string> &args)
   std::vector<std::pair<crypto::key_image, std::vector<uint64_t>>> rings;
   try
   {
+    bool found_ring_data = false;
     if (m_wallet->get_ring(key_image, ring))
+    {
       rings.push_back({key_image, ring});
-    else if (!m_wallet->get_rings(txid, rings))
+      found_ring_data = !ring.empty();
+    }
+    else if (m_wallet->get_rings(txid, rings))
+    {
+      for (const auto &entry: rings)
+      {
+        if (!entry.second.empty())
+        {
+          found_ring_data = true;
+          break;
+        }
+      }
+    }
+    else
+    {
+      if (uses_legacy_ring_signature_ux(m_wallet.get()))
+        fail_msg_writer() << tr("Key image either not spent, or spent with ring size 1");
+      else
+        fail_msg_writer() << tr("Key image either not spent, or is an FCMP++ transaction (no ring data)");
+      return true;
+    }
+
+    if (!found_ring_data)
     {
       if (uses_legacy_ring_signature_ux(m_wallet.get()))
         fail_msg_writer() << tr("Key image either not spent, or spent with ring size 1");
@@ -3459,7 +3418,7 @@ simple_wallet::simple_wallet()
                            tr("Show the blockchain height."));
   m_cmd_binder.set_handler("transfer", boost::bind(&simple_wallet::on_command, this, &simple_wallet::transfer, _1),
                            tr(USAGE_TRANSFER),
-                           tr("Transfer <amount> <address>. If the parameter \"index=<N1>[,<N2>,...]\" is specified, the wallet uses outputs received by addresses of those indices. If omitted, the wallet randomly chooses address indices to be used. In any case, it tries its best not to combine outputs across multiple addresses. <priority> is the priority of the transaction. The higher the priority, the higher the transaction fee. Valid values in priority order (from lowest to highest) are: unimportant, normal, elevated, priority, max. If omitted, the default value (see the command \"set priority\") is used. <ring_size> is the number of inputs to include for untraceability. Multiple payments can be made at once by adding URI_2 or <address_2> <amount_2> etcetera (before the payment ID, if it's included). The \"subtractfeefrom=\" list allows you to choose which destinations to fund the tx fee from instead of the change output. The fee will be split across the chosen destinations proportionally equally. For example, to make 3 transfers where the fee is taken from the first and third destinations, one could do: \"transfer <addr1> 3 <addr2> 0.5 <addr3> 1 subtractfeefrom=0,2\". Let's say the tx fee is 0.1. The balance would drop by exactly 4.5 XMR including fees, and addr1 & addr3 would receive 2.925 & 0.975 XMR, respectively. Use \"subtractfeefrom=all\" to spread the fee across all destinations."));
+                           tr("Transfer <amount> <address>. If the parameter \"index=<N1>[,<N2>,...]\" is specified, the wallet uses outputs received by addresses of those indices. If omitted, the wallet randomly chooses address indices to be used. In any case, it tries its best not to combine outputs across multiple addresses. <priority> is the priority of the transaction. The higher the priority, the higher the transaction fee. Valid values in priority order (from lowest to highest) are: unimportant, normal, elevated, priority, max. If omitted, the default value (see the command \"set priority\") is used. Multiple payments can be made at once by adding URI_2 or <address_2> <amount_2> etcetera (before the payment ID, if it's included). The \"subtractfeefrom=\" list allows you to choose which destinations to fund the tx fee from instead of the change output. The fee will be split across the chosen destinations proportionally equally. For example, to make 3 transfers where the fee is taken from the first and third destinations, one could do: \"transfer <addr1> 3 <addr2> 0.5 <addr3> 1 subtractfeefrom=0,2\". Let's say the tx fee is 0.1. The balance would drop by exactly 4.5 XMR including fees, and addr1 & addr3 would receive 2.925 & 0.975 XMR, respectively. Use \"subtractfeefrom=all\" to spread the fee across all destinations."));
   m_cmd_binder.set_handler("sweep_unmixable",
                            boost::bind(&simple_wallet::on_command, this, &simple_wallet::sweep_unmixable, _1),
                            tr("Send all unmixable outputs to yourself with ring_size 1"));
@@ -6997,7 +6956,7 @@ bool simple_wallet::transfer(const std::vector<std::string> &args_)
   CHECK_IF_BACKGROUND_SYNCING("cannot transfer");
   if (args_.size() < 1)
   {
-    PRINT_USAGE(get_transfer_usage(uses_legacy_ring_signature_ux(m_wallet.get())).c_str());
+    PRINT_USAGE(USAGE_TRANSFER);
     return true;
   }
   transfer_main(args_, false);
@@ -7120,18 +7079,17 @@ bool simple_wallet::sweep_main(uint32_t account, uint64_t below, const std::vect
   CHECK_IF_BACKGROUND_SYNCING("cannot sweep");
   auto print_usage = [this, account, below]()
   {
-    const bool legacy_ring_ux = uses_legacy_ring_signature_ux(m_wallet.get());
     if (below)
     {
-      PRINT_USAGE(get_sweep_below_usage(legacy_ring_ux).c_str());
+      PRINT_USAGE(USAGE_SWEEP_BELOW);
     }
     else if (account == m_current_subaddress_account)
     {
-      PRINT_USAGE(get_sweep_all_usage(legacy_ring_ux).c_str());
+      PRINT_USAGE(USAGE_SWEEP_ALL);
     }
     else
     {
-      PRINT_USAGE(get_sweep_account_usage(legacy_ring_ux).c_str());
+      PRINT_USAGE(USAGE_SWEEP_ACCOUNT);
     }
   };
   if (args_.size() == 0)
@@ -7195,23 +7153,17 @@ bool simple_wallet::sweep_main(uint32_t account, uint64_t below, const std::vect
   bool payment_id_seen = false;
   if (local_args.size() >= 2)
   {
-    std::string payment_id_str = local_args.back();
-
     crypto::hash payment_id;
-    bool r = tools::wallet2::parse_long_payment_id(payment_id_str, payment_id);
-    if(r)
+    if (tools::wallet2::parse_long_payment_id(local_args.back(), payment_id))
     {
       LONG_PAYMENT_ID_SUPPORT_CHECK();
     }
+  }
 
-    if(!r && local_args.size() == 3)
-    {
-      fail_msg_writer() << tr("payment id has invalid format, expected 16 or 64 character hex string: ") << payment_id_str;
-      print_usage();
-      return true;
-    }
-    if (payment_id_seen)
-      local_args.pop_back();
+  if (local_args.size() != 1)
+  {
+    print_usage();
+    return true;
   }
 
   cryptonote::address_parse_info info;
@@ -7415,30 +7367,15 @@ bool simple_wallet::sweep_single(const std::vector<std::string> &args_)
   if (local_args.size() == 3)
   {
     crypto::hash payment_id;
-    std::string extra_nonce;
     if (tools::wallet2::parse_long_payment_id(local_args.back(), payment_id))
     {
       LONG_PAYMENT_ID_SUPPORT_CHECK();
     }
-    else
-    {
-      fail_msg_writer() << tr("failed to parse Payment ID");
-      return true;
-    }
-
-    if (!add_extra_nonce_to_tx_extra(extra, extra_nonce))
-    {
-      fail_msg_writer() << tr("failed to set up payment id, though it was decoded correctly");
-      return true;
-    }
-
-    local_args.pop_back();
-    payment_id_seen = true;
   }
 
   if (local_args.size() != 2)
   {
-    PRINT_USAGE(get_sweep_single_usage(uses_legacy_ring_signature_ux(m_wallet.get())).c_str());
+    PRINT_USAGE(USAGE_SWEEP_SINGLE);
     return true;
   }
 
@@ -7598,7 +7535,7 @@ bool simple_wallet::sweep_account(const std::vector<std::string> &args_)
   auto local_args = args_;
   if (local_args.empty())
   {
-    PRINT_USAGE(get_sweep_account_usage(uses_legacy_ring_signature_ux(m_wallet.get())).c_str());
+    PRINT_USAGE(USAGE_SWEEP_ACCOUNT);
     return true;
   }
   uint32_t account = 0;
@@ -7620,7 +7557,7 @@ bool simple_wallet::sweep_below(const std::vector<std::string> &args_)
   if (args_.size() < 1)
   {
     fail_msg_writer() << tr("missing threshold amount");
-    PRINT_USAGE(get_sweep_below_usage(uses_legacy_ring_signature_ux(m_wallet.get())).c_str());
+    PRINT_USAGE(USAGE_SWEEP_BELOW);
     return true;
   }
   if (!cryptonote::parse_amount(below, args_[0]))
@@ -7638,7 +7575,7 @@ bool simple_wallet::donate(const std::vector<std::string> &args_)
   std::vector<std::string> local_args = args_;
   if(local_args.empty() || local_args.size() > 5)
   {
-     PRINT_USAGE(get_donate_usage(uses_legacy_ring_signature_ux(m_wallet.get())).c_str());
+     PRINT_USAGE(USAGE_DONATE);
      return true;
   }
   std::string amount_str;
