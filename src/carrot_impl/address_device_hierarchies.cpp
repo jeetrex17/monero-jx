@@ -65,8 +65,10 @@ static void assert_single_derive_type(const carrot::AddressDeriveType expected_d
 
     if (actual_derive_type != expected_derive_type && actual_derive_type != carrot::AddressDeriveType::Auto)
     {
-        CARROT_THROW(make_error, "Expected derive type " << static_cast<int>(expected_derive_type)
-            << ", got derive type " << static_cast<int>(actual_derive_type));
+        std::stringstream ss;
+        ss << "Expected derive type " << static_cast<int>(expected_derive_type)
+            << ", got derive type " << static_cast<int>(actual_derive_type);
+        throw make_error(ss.str());
     }
 }
 } //anonymous namespace
@@ -401,8 +403,12 @@ const address_device& hybrid_hierarchy_address_device::resolve_address_device(co
         break;
     };
 
-    CARROT_CHECK_AND_THROW(p_resolved_addr_dev,
-        make_error, "Derive type not supported for this hybrid address device: " << static_cast<int>(derive_type));
+    if (!p_resolved_addr_dev)
+    {
+        std::stringstream ss;
+        ss << "Derive type not supported for this hybrid address device: " << static_cast<int>(derive_type);
+        throw make_error(ss.str());
+    }
 
     return *p_resolved_addr_dev;
 }
